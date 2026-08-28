@@ -50,8 +50,21 @@ export async function POST(req: NextRequest) {
     const user = await col.findOne({ email });
     if (!user || user.deletedAt) return same;
 
+    // No trustworthy address to build the link from means no email: sending
+    // one built from the request's Host header would mail a working token to
+    // wherever the requester asked. The caller still gets the same answer as
+    // everyone else, and the operator gets a log line telling them what to fix.
+    const base = appUrl(req);
+    if (!base) {
+      console.error(
+        '[chatbot-forge] NEXT_PUBLIC_APP_URL is not set, so no reset link can be built safely. ' +
+          'Password resets are disabled until it is configured.',
+      );
+      return same;
+    }
+
     const token = await issueToken(user, 'reset');
-    const link = `${appUrl(req)}/reset?token=${encodeURIComponent(token)}`;
+    const link = `${base}/reset?token=${encodeURIComponent(token)}`;
 
     await sendMail({
       to: user.email,

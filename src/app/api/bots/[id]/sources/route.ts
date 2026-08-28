@@ -6,6 +6,7 @@ import { MAX_FILE_BYTES, SUPPORTED_EXTENSIONS } from '@/lib/knowledge/extract';
 import { assertPublicUrl } from '@/lib/knowledge/crawl';
 import { readJsonObject, serverError } from '@/lib/http';
 import { resolveOwner as ownerOf, isAnonOwner, LOGIN_REQUIRED } from '@/lib/auth';
+import { consume } from '@/lib/ratelimit';
 import type { BotDoc, SourceDoc, SourceType } from '@/lib/types';
 
 export const runtime = 'nodejs';
@@ -20,6 +21,9 @@ export const dynamic = 'force-dynamic';
  */
 export const maxDuration = 60;
 
+/** Sources one account may add per hour. Generous for a person, not for a script. */
+const INGEST_LIMIT = { max: 30, windowSec: 3_600 };
+
 async function loadOwned(req: NextRequest, botId: string) {
   const ownerId = await ownerOf(req);
   if (!ownerId) return { error: NextResponse.json({ error: LOGIN_REQUIRED }, { status: 401 }) };
@@ -29,7 +33,7 @@ async function loadOwned(req: NextRequest, botId: string) {
   if (doc.ownerId !== ownerId) {
     return { error: NextResponse.json({ error: 'This chatbot belongs to another browser profile.' }, { status: 403 }) };
   }
-  return { doc };
+  return { doc, ownerId };
 }
 
 /** GET /api/bots/:id/sources — everything in this bot's knowledge base. */
@@ -68,7 +72,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
  */
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const { doc, error } = await loadOwned(req, params.id);
+    const { doc, ownerId, error } = await loadOwned(req, params.id);
     if (error) return error;
 
     // Uploads and crawls consume storage and fetch bandwidth — account
@@ -78,6 +82,17 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       return NextResponse.json(
         { error: 'Create a free account to upload documents or crawl websites. Drafts can use the info text and Q&A pairs meanwhile.' },
         { status: 403 },
+      );
+    }
+
+    // Ingestion fetches other people's websites and parses whatever comes back,
+    // on this server's address. Accounts are free to create, so "logged in" is
+    // not on its own a reason to let someone do that without limit.
+    const budget = await consume(`ingest:${ownerId}`, INGEST_LIMIT);
+    if (!budget.ok) {
+      return NextResponse.json(
+        { error: 'That is a lot of indexing in one go. Give it a few minutes and add the rest after.' },
+        { status: 429, headers: { 'Retry-After': String(budget.retryAfter) } },
       );
     }
 

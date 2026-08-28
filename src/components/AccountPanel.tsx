@@ -81,7 +81,10 @@ export default function AccountPanel() {
       notifyAuthChanged();
       // Sent here from a page that needed login? Go back to it.
       const next = new URLSearchParams(window.location.search).get('next');
-      if (next && next.startsWith('/')) router.push(next);
+      // A single leading slash is not enough: `//evil.example` is a
+      // protocol-relative URL, so it passes that test and navigates straight
+      // off the site — from a link that looks like a normal login prompt.
+      if (next && next.startsWith('/') && !next.startsWith('//')) router.push(next);
       else router.refresh();
     } catch (e: any) {
       setError(e.message);

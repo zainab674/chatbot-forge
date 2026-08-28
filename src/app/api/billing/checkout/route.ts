@@ -65,11 +65,22 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Stripe needs somewhere to send the customer back to, and that somewhere
+    // must not come from a header the caller wrote.
+    const origin = appUrl(req);
+    if (!origin) {
+      console.error('[chatbot-forge] NEXT_PUBLIC_APP_URL is not set; checkout cannot build its return URLs.');
+      return NextResponse.json(
+        { error: 'Card payments are not fully configured on this deployment yet.' },
+        { status: 503 },
+      );
+    }
+
     const checkout = await createCheckoutSession({
       pack,
       userId: user.id,
       email: user.email,
-      origin: appUrl(req),
+      origin,
     });
     return NextResponse.json({ url: checkout.url });
   } catch (e) {

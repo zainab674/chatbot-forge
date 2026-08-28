@@ -27,6 +27,7 @@ export async function notifyOwnerOfBooking(
   // owner's, and this email quotes what a visitor typed.
   if (!owner.emailVerifiedAt) return;
 
+  const base = appUrl(req);
   const details = [
     `Contact: ${booking.contact}`,
     booking.when && `Asked for: ${booking.when}`,
@@ -41,7 +42,9 @@ export async function notifyOwnerOfBooking(
       '',
       ...details,
       '',
-      `Confirm or cancel it here: ${appUrl(req)}/bots/${bot.id}`,
+      // This notification carries no token, so it degrades to a plain sentence
+      // rather than being withheld when there is no trusted address to link to.
+      base ? `Confirm or cancel it here: ${base}/bots/${bot.id}` : 'Open the manage screen for this bot to confirm it.',
     ].join('\n'),
   });
 }

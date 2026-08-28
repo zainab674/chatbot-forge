@@ -14,7 +14,14 @@ export async function sendVerification(
   email: string,
   token: string,
 ): Promise<void> {
-  const link = `${appUrl(req)}/verify?token=${encodeURIComponent(token)}`;
+  const base = appUrl(req);
+  // Same rule as the reset link: no trusted address, no emailed link.
+  if (!base) {
+    console.error('[chatbot-forge] NEXT_PUBLIC_APP_URL is not set; skipping the verification email.');
+    return;
+  }
+
+  const link = `${base}/verify?token=${encodeURIComponent(token)}`;
   await sendMail({
     to: email,
     subject: 'Confirm your email for Chatbot Forge',

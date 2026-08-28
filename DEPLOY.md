@@ -163,6 +163,9 @@ refused, and each Stripe event id can only pay out once.
 
 Test with Stripe's test keys and a `4242 4242 4242 4242` card before switching to live keys.
 
+**Do step 1 first.** Buying credits requires a confirmed email address, and confirming one requires
+a working mailer — so Stripe configured without email means nobody can complete a purchase.
+
 ### 4. Fill in the legal pages
 
 /privacy and /terms are accurate about what the software does, and carry bracketed placeholders

@@ -67,6 +67,14 @@ const CHARS_PER_TOKEN = 4;
  */
 export const PLATFORM_MAX_PROMPT_CHARS = 24_000;
 export const PLATFORM_MAX_OUTPUT_TOKENS = 1_024;
+/**
+ * A bot's own instructions can legitimately be long — the builder allows 24k
+ * characters of `info` alone — so the system prompt gets its own ceiling rather
+ * than being allowed to eat the whole budget and leave nothing for the visitor.
+ */
+export const PLATFORM_MAX_SYSTEM_CHARS = 16_000;
+/** Whatever else happens, the visitor's own message gets at least this much room. */
+const MIN_MESSAGE_CHARS = 2_000;
 
 /** Credits a request of this size costs, always at least one. */
 export function creditsFor(promptChars: number, maxTokens: number): number {
@@ -75,24 +83,37 @@ export function creditsFor(promptChars: number, maxTokens: number): number {
 }
 
 /**
- * Trims a conversation to what the platform tier will pay for.
+ * Trims a request to what the platform tier will pay for.
  *
- * Returns the messages to actually send and the output cap to use. Trimming
- * from the front keeps the most recent turns, which are the ones that matter.
+ * Returns what to actually send: the system prompt, the messages, and the
+ * output cap. Trimming drops the oldest turns first, because the recent ones
+ * are the ones that matter.
+ *
+ * Every branch here has to *reduce* something. An earlier version computed the
+ * remaining budget as `ceiling - systemChars` and then kept the tail of the
+ * last message with `slice(-budget)` — which returns the whole string when the
+ * budget reaches zero, so an oversized system prompt disabled the very cap it
+ * had just exhausted. Hence the floor below, and the separate system ceiling.
  */
 export function fitToPlatformBudget<T extends { content: string }>(
   messages: T[],
-  systemChars: number,
+  system: string,
   maxTokens: number,
-): { messages: T[]; maxTokens: number; promptChars: number } {
-  const budget = Math.max(0, PLATFORM_MAX_PROMPT_CHARS - systemChars);
+): { messages: T[]; system: string; maxTokens: number; promptChars: number } {
+  const fittedSystem =
+    system.length > PLATFORM_MAX_SYSTEM_CHARS
+      ? `${system.slice(0, PLATFORM_MAX_SYSTEM_CHARS)}\n\n[Instructions truncated to fit the platform credit limit.]`
+      : system;
+
+  const budget = Math.max(MIN_MESSAGE_CHARS, PLATFORM_MAX_PROMPT_CHARS - fittedSystem.length);
   const kept: T[] = [];
   let used = 0;
 
   for (let i = messages.length - 1; i >= 0; i--) {
     const m = messages[i];
     if (used + m.content.length > budget) {
-      // Always keep at least the latest message, truncated if it alone is huge.
+      // Always keep the latest message, trimmed to what is left. `budget` is
+      // guaranteed positive by the floor above, so this always shortens.
       if (!kept.length) kept.unshift({ ...m, content: m.content.slice(-budget) });
       break;
     }
@@ -102,8 +123,9 @@ export function fitToPlatformBudget<T extends { content: string }>(
 
   return {
     messages: kept,
+    system: fittedSystem,
     maxTokens: Math.min(maxTokens, PLATFORM_MAX_OUTPUT_TOKENS),
-    promptChars: systemChars + kept.reduce((n, m) => n + m.content.length, 0),
+    promptChars: fittedSystem.length + kept.reduce((n, m) => n + m.content.length, 0),
   };
 }
 

@@ -41,12 +41,14 @@ import {
   TRIAL_PER_IP,
   PLATFORM_MAX_PROMPT_CHARS,
   PLATFORM_MAX_OUTPUT_TOKENS,
+  PLATFORM_MAX_SYSTEM_CHARS,
   TOKENS_PER_CREDIT,
 } from '../src/lib/credits';
 import { users as usersCollection } from '../src/lib/mongodb';
 import { setPlatformKey } from '../src/lib/platform-keys';
 import { verifyWebhookSignature, stripeConfigured } from '../src/lib/stripe';
 import { PACKS, getPack, formatPrice } from '../src/lib/packs';
+import { appUrl, mailConfigured } from '../src/lib/mail';
 import type { BotConfig } from '../src/lib/types';
 import { CHAT_THEMES, getChatTheme } from '../src/lib/themes';
 
@@ -649,23 +651,40 @@ async function creditTests() {
   check('output tokens are priced too', creditsFor(0, TOKENS_PER_CREDIT * 2) === 2);
 
   const huge = [{ role: 'user' as const, content: 'x'.repeat(100_000) }];
-  const fitted = fitToPlatformBudget(huge, 500, 8192);
+  const fitted = fitToPlatformBudget(huge, 'y'.repeat(500), 8192);
   check('an oversized prompt is trimmed to the ceiling', fitted.promptChars <= PLATFORM_MAX_PROMPT_CHARS);
   check('the output cap is clamped', fitted.maxTokens === PLATFORM_MAX_OUTPUT_TOKENS);
   check('the latest message always survives trimming', fitted.messages.length === 1);
 
   const many = Array.from({ length: 40 }, (_, i) => ({ role: 'user' as const, content: 'y'.repeat(1_000) + i }));
-  const trimmedFit = fitToPlatformBudget(many, 1_000, 256);
+  const trimmedFit = fitToPlatformBudget(many, 'z'.repeat(1_000), 256);
   check('old turns are dropped before recent ones', trimmedFit.messages.length < many.length);
   check(
     'the most recent turn is the one kept',
     trimmedFit.messages[trimmedFit.messages.length - 1].content === many[many.length - 1].content,
   );
-  check('a small conversation is left alone', fitToPlatformBudget(
-    [{ role: 'user' as const, content: 'hi' }],
-    100,
-    256,
-  ).messages.length === 1);
+  check(
+    'a small conversation is left alone',
+    fitToPlatformBudget([{ role: 'user' as const, content: 'hi' }], 'short system', 256).messages.length === 1,
+  );
+
+  // Regression: the budget used to be computed as `ceiling - systemChars`, and
+  // the last message was kept with `slice(-budget)`. A system prompt bigger
+  // than the ceiling drove that to zero, and `slice(-0)` returns the whole
+  // string — so an oversized bot description switched off the very cap it had
+  // just exhausted, and the entire conversation went upstream untrimmed.
+  const bloated = fitToPlatformBudget(huge, 'S'.repeat(40_000), 8192);
+  check('an oversized system prompt is itself truncated', bloated.system.length < 40_000);
+  check('it is truncated to the documented ceiling', bloated.system.length <= PLATFORM_MAX_SYSTEM_CHARS + 200);
+  check('the truncation is visible to the model', /truncated/i.test(bloated.system));
+  check('the conversation is still trimmed, not passed through whole',
+    bloated.messages[0].content.length < 100_000);
+  check('the visitor still gets room to be heard', bloated.messages[0].content.length >= 1_000);
+  check('a system prompt at exactly the ceiling is left alone',
+    fitToPlatformBudget(huge, 'S'.repeat(PLATFORM_MAX_SYSTEM_CHARS), 256).system.length === PLATFORM_MAX_SYSTEM_CHARS);
+  check('pricing reflects what is actually sent',
+    creditsFor(bloated.promptChars, bloated.maxTokens) >=
+      creditsFor(fitted.promptChars, fitted.maxTokens));
 
   group('Credit balances');
   const col = await usersCollection();
@@ -852,6 +871,58 @@ function billingTests() {
   check(
     'one good signature among several is enough',
     verifyWebhookSignature(payload, `${sign(payload, t)},v1=deadbeef`, secret, now).ok,
+  );
+
+  group('Link addresses in email');
+
+  // A password reset is requested by an attacker and delivered to the victim.
+  // If the link came from the request's own Host header, that email would carry
+  // a real, working token pointing at the attacker's server — and it would look
+  // entirely legitimate to the person receiving it.
+  const withEnv = (vars: Record<string, string | undefined>, fn: () => boolean) => {
+    const saved: Record<string, string | undefined> = {};
+    for (const [k, v] of Object.entries(vars)) {
+      saved[k] = process.env[k];
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+    try {
+      return fn();
+    } finally {
+      for (const [k, v] of Object.entries(saved)) {
+        if (v === undefined) delete process.env[k];
+        else process.env[k] = v;
+      }
+    }
+  };
+
+  const forged = { headers: new Headers({ host: 'evil.example' }) };
+
+  check(
+    'a forged Host is ignored in production',
+    withEnv({ NODE_ENV: 'production', NEXT_PUBLIC_APP_URL: undefined }, () => appUrl(forged) === null),
+  );
+  check(
+    'the configured address always wins',
+    withEnv({ NODE_ENV: 'production', NEXT_PUBLIC_APP_URL: 'https://forge.example' }, () =>
+      appUrl(forged) === 'https://forge.example',
+    ),
+  );
+  check(
+    'a trailing slash is normalised away',
+    withEnv({ NODE_ENV: 'production', NEXT_PUBLIC_APP_URL: 'https://forge.example/' }, () =>
+      appUrl(forged) === 'https://forge.example',
+    ),
+  );
+  check(
+    'development still works with no configuration',
+    withEnv({ NODE_ENV: 'development', NEXT_PUBLIC_APP_URL: undefined }, () =>
+      appUrl({ headers: new Headers({ host: 'localhost:3000' }) }) === 'http://localhost:3000',
+    ),
+  );
+  check(
+    'the mailer is off until both settings are present',
+    withEnv({ RESEND_API_KEY: 'x', MAIL_FROM: undefined }, () => !mailConfigured()),
   );
 
   group('Credit packs');

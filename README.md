@@ -292,11 +292,27 @@ public/widget.js                   the embeddable loader, no build step
   calls that carry no browser origin at all, which means a server-side script using the REST API
   needs its own domain added. Treat it as a control on honest embedding rather than a hard boundary:
   the header is only as trustworthy as the browser that sent it.
-- **Rate limiting**, two token buckets per request. One per visitor (20 a minute) stops a single
+- **Rate limiting**, two shared windows per request. One per visitor (20 a minute) stops a single
   person hammering the widget; one per chatbot (240 a minute) is what actually caps spend, since a
   client identifier is spoofable and rotating it would otherwise sidestep the first limit entirely.
-  Both are checked before either is charged, so a bot-wide rejection does not cost the visitor a
-  token. In-process; swap `src/lib/ratelimit.ts` for Redis if you run more than one instance.
+  A bot-wide rejection refunds the visitor's own window, so it cannot lock them out of a chatbot
+  that has already recovered. The counters live in MongoDB, not in the process: on a serverless host
+  an in-process counter resets exactly when it is needed.
+- **A platform API key never leaves the vendor's endpoint.** A bot's custom base URL is honoured
+  only when the request carries the creator's own key, or no key at all — otherwise a bot pointed at
+  `https://attacker.example/v1` would be handed the platform's key in an `Authorization` header.
+  Creator-supplied endpoints get the same DNS and redirect checks as the crawler.
+- **Passwords** are scrypt-hashed with a random salt per account, and reset links are stored only as
+  a SHA-256 hash, so a database dump does not hand over the ability to take accounts. Links built
+  into emails come from `NEXT_PUBLIC_APP_URL` rather than the request's `Host` header, which the
+  requester writes.
+- **Sessions can be ended.** The cookie is a signed token carrying its issue time; a password reset
+  or "log out everywhere" moves the account's cutoff forward and every earlier token stops working,
+  on every device.
+- **Payments are confirmed by Stripe, not by the browser.** Credits are granted only by a webhook
+  whose signature is verified against the raw body, and each Stripe event id can pay out once.
+- **Personal data expires.** Booking requests, stored transcripts, reset tokens and rate-limit
+  windows all carry a TTL, and an account can export or delete everything from `/account`.
 - **Iframe isolation.** The widget cannot read the host page or vice versa. The only channel is a
   narrow `postMessage` whose origin is verified.
 - **Contrast.** Text on the accent colour picks white or near-black by luminance, and nudges the
@@ -304,15 +320,29 @@ public/widget.js                   the embeddable loader, no build step
 
 ### Before going to production
 
-1. **Add real auth.** Ownership is currently a random id in `localStorage` sent as `x-owner-id`,
-   which keeps the demo login-free but means anyone who learns an owner id can edit those bots.
-   Replace the `ownerOf()` helper in the API routes with your session lookup. That is the whole
-   change.
-2. Move rate limiting to shared storage (Redis or Upstash) if you run more than one instance.
-3. Move ingestion to a background job if you expect large sitemap crawls. It currently runs inside
-   the request, with `maxDuration` set to 300 seconds.
-4. Set `NEXT_PUBLIC_APP_URL` so generated snippets point at your real domain.
-5. Consider per-bot monthly message caps if creators are strangers.
+Accounts, shared rate limiting, password recovery, payments and data retention are all in place —
+see **Going live with real customers** in [DEPLOY.md](DEPLOY.md) for the settings each one needs.
+The short version:
+
+1. Set `NEXT_PUBLIC_APP_URL`. Emailed links and Stripe return URLs refuse to fall back to the
+   request's `Host` header in production, so without it password resets do not send.
+2. Set `RESEND_API_KEY` and `MAIL_FROM`, or nobody can recover a forgotten password.
+3. Check the unique index on `users.email` actually built — it silently fails if the collection
+   already holds duplicate addresses. The query is in DEPLOY.md.
+4. Configure the Stripe webhook, or leave Stripe unset and keep top-ups manual through `/admin`.
+5. Fill in the operator placeholders on `/privacy` and `/terms`, and have both reviewed.
+
+Still open, and worth knowing about:
+
+- **Anonymous drafts are still identified by a random id in `localStorage`**, sent as `x-owner-id`.
+  That is what lets someone build a bot before signing up, and it means anyone who learns a draft's
+  owner id can edit that draft. Registered accounts use a signed session cookie instead, and API
+  keys, uploads and credits are account-only for exactly this reason.
+- Ingestion runs inside the request rather than as a background job, so a very large sitemap crawl
+  is bounded by the host's function timeout (60 seconds on Netlify).
+- There are no per-bot monthly caps, only per-minute rate limits and the credit balance. Consider
+  adding one if creators are strangers.
+- Passwords need eight characters and nothing else — no breach-list check.
 
 ---
 
@@ -320,10 +350,11 @@ public/widget.js                   the embeddable loader, no build step
 
 ```bash
 npm run typecheck      # tsc --noEmit
-npm test               # 105 unit and adapter tests, no DB needed
+npm test               # 237 unit and adapter tests, no DB needed
 npm run test:knowledge # 128 knowledge base tests
-npm run test:e2e       # 49 end-to-end HTTP checks against a real server
-npm run test:visual    # 35 browser checks in Chromium, writes screenshots/
+npm run test:e2e       # 117 end-to-end HTTP checks against a real server
+npm run test:visual    # 41 browser checks in Chromium, writes screenshots/
+npm run test:nav       # 37 navigation checks in Chromium
 npm run test:all       # all of the above
 ```
 

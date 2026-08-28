@@ -28,12 +28,26 @@ export function mailConfigured(): boolean {
   return Boolean(process.env.RESEND_API_KEY && process.env.MAIL_FROM);
 }
 
-/** The address links in emails point at. */
-export function appUrl(req?: { headers: Headers }): string {
+/**
+ * The address links in emails point at.
+ *
+ * Returns null rather than guessing in production, because the obvious guess —
+ * the request's own Host header — is written by whoever sent the request. A
+ * password reset is requested by an attacker and delivered to the victim, so a
+ * Host of `evil.example` would put a real, working reset token into a link
+ * pointing at the attacker's server, in an email the victim has every reason to
+ * trust. Set NEXT_PUBLIC_APP_URL and there is nothing to guess.
+ *
+ * The Host fallback survives only outside production, where it is what makes
+ * `npm run dev` work without configuration.
+ */
+export function appUrl(req?: { headers: Headers }): string | null {
   const configured = process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, '');
   if (configured) return configured;
+  if (process.env.NODE_ENV === 'production') return null;
+
   const host = req?.headers.get('host');
-  if (host) return `${host.startsWith('localhost') ? 'http' : 'https'}://${host}`;
+  if (host) return `${host.startsWith('localhost') || host.startsWith('127.') ? 'http' : 'https'}://${host}`;
   return 'http://localhost:3000';
 }
 

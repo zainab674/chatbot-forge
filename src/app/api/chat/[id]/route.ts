@@ -129,22 +129,19 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   let charged = 0;
 
   // What actually gets sent. On the platform's money both the conversation and
-  // the output cap are trimmed to a bounded size first, so the cost of one
-  // message cannot run away — and so the price below is about what was sent
-  // rather than about what was asked for.
+  // the output cap are trimmed to a bounded size, so the cost of one message
+  // cannot run away — and so the price is about what was sent rather than about
+  // what was asked for.
   //
   // Priced against the prompt without retrieved context, because the key needed
   // to embed the query has not been granted yet. The final payload is re-fitted
-  // below once the context is known, so the hard ceiling still holds; only the
-  // price can end up slightly under, which is the right way round to be wrong.
+  // below once the context is known, so the ceiling still holds; only the price
+  // can end up slightly under, which is the right way round to be wrong.
   let outgoing = trimmed;
   let outputCap = doc.maxTokens;
-  const onPlatformBudget = !apiKey;
 
   if (!apiKey) {
-    const budgeted = fitToPlatformBudget(trimmed, buildSystemPrompt(doc).length, doc.maxTokens);
-    outgoing = budgeted.messages;
-    outputCap = budgeted.maxTokens;
+    const budgeted = fitToPlatformBudget(trimmed, buildSystemPrompt(doc), doc.maxTokens);
     const price = creditsFor(budgeted.promptChars, budgeted.maxTokens);
 
     if (isAnonOwner(doc.ownerId)) {
@@ -165,6 +162,14 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       } else if (!provider.keyOptional) {
         return fail(denialMessage(platform.reason), 400);
       }
+    }
+
+    // Only if a platform key was actually granted. A keyless self-hosted
+    // endpoint reaches this branch too — it costs the platform nothing, so
+    // trimming its prompts would be a limit imposed for no reason.
+    if (apiKey) {
+      outgoing = budgeted.messages;
+      outputCap = budgeted.maxTokens;
     }
   }
 
@@ -245,12 +250,15 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const promptContext = hasSources
     ? { block: contextBlock, count: contextCount, searchedButEmpty: contextCount === 0 }
     : undefined;
-  const system = buildSystemPrompt(doc, promptContext);
+  let system = buildSystemPrompt(doc, promptContext);
 
   // Retrieved context can be large, so the ceiling is applied once more against
-  // the prompt that is actually going upstream.
-  if (onPlatformBudget) {
-    outgoing = fitToPlatformBudget(outgoing, system.length, outputCap).messages;
+  // the prompt that is actually going upstream — this is the pass that decides
+  // what is sent, and it trims the system prompt as well as the conversation.
+  if (onPlatformKey) {
+    const fitted = fitToPlatformBudget(outgoing, system, outputCap);
+    outgoing = fitted.messages;
+    system = fitted.system;
   }
 
   try {
