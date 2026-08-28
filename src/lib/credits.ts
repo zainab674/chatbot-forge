@@ -55,6 +55,8 @@ export interface PlatformGrant {
  * rough conversion and is close enough for billing that rounds up anyway.
  */
 export const TOKENS_PER_CREDIT = 4_000;
+/** How long per-message spend rows are kept. Purchases never expire. */
+const SPEND_HISTORY_DAYS = 90;
 const CHARS_PER_TOKEN = 4;
 
 /**
@@ -211,6 +213,9 @@ async function record(
       createdAt: new Date().toISOString(),
     };
     if (reference) row.reference = reference;
+    // One row per message adds up fast, and nobody audits last year's
+    // individual messages. Anything involving money is kept indefinitely.
+    if (reason === 'spend') row.expiresAt = new Date(Date.now() + SPEND_HISTORY_DAYS * 86_400_000);
     await col.insertOne(row as any);
   } catch (e) {
     // The ledger is the audit trail, not the balance. Losing a row is worth a

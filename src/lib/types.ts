@@ -297,4 +297,10 @@ export interface LedgerDoc {
   note: string;
   reference?: string;
   createdAt: string;
+  /**
+   * Set on `spend` rows only, which are written once per message and would
+   * otherwise outgrow every other collection here. Money movements — purchases,
+   * refunds, admin grants — have no expiry and are kept indefinitely.
+   */
+  expiresAt?: Date;
 }

@@ -164,7 +164,10 @@ export async function resolveOwner(req: NextRequest): Promise<string | null> {
     // password reset mean anything on this surface rather than only on /me.
     const { users } = await import('./mongodb');
     const user = await (await users()).findOne({ id: session.userId }, { projection: { _id: 0, passwordHash: 0 } });
-    if (user && !sessionRevoked(session, user)) return session.userId;
+    // A deletion in flight has already marked the account and revoked its
+    // sessions; nothing should still answer as its owner while the rest of the
+    // erasing catches up.
+    if (user && !user.deletedAt && !sessionRevoked(session, user)) return session.userId;
     if (user) return null;
   }
   const anon = req.headers.get('x-owner-id')?.trim() ?? '';

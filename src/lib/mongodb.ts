@@ -145,12 +145,19 @@ export function conversations(): Promise<Collection<ConversationDoc>> {
   ]);
 }
 
-/** Every credit movement, so a balance can always be explained. */
+/**
+ * Every credit movement, so a balance can always be explained.
+ *
+ * The TTL index only ever removes `spend` rows, which are the ones that carry
+ * an `expiresAt` — a busy bot writes one per message. Purchases and refunds
+ * have no expiry set, and a TTL index ignores documents missing the field.
+ */
 export function ledger(): Promise<Collection<LedgerDoc>> {
   return collection<LedgerDoc>('ledger', [
     { id: 1 },
     { userId: 1, createdAt: -1 },
     { key: { reference: 1 }, options: { unique: true, sparse: true } },
+    { key: { expiresAt: 1 }, options: { expireAfterSeconds: 0 } },
   ]);
 }
 
