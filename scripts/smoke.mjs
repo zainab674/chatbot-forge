@@ -96,6 +96,17 @@ function startFakeModel() {
           return;
         }
 
+        // One model always fails, and quotes the key it rejected — which is what
+        // OpenAI's 401 body actually does. That is how the test can tell whether
+        // a platform key leaks through an upstream error to the visitor.
+        if (parsed.model === 'gpt-4.1-mini') {
+          res.writeHead(401, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            error: { message: `Incorrect API key provided: ${String(auth).replace('Bearer ', '')}.` },
+          }));
+          return;
+        }
+
         const system = parsed.messages?.[0]?.role === 'system' ? parsed.messages[0].content : '';
         res.writeHead(200, { 'Content-Type': 'text/event-stream' });
         const words = [
@@ -824,6 +835,40 @@ async function main() {
     await fetch(`${keysUrl}?provider=openai`, { method: 'DELETE', headers: adminHeaders });
     await fetch(`${BASE}/api/bots/${tierId}`, { method: 'DELETE', headers: adminHeaders });
 
+    // A provider's rejection quotes the key it rejected, in masked form. On the
+    // creator's own key that is a useful diagnostic; on the platform's key it
+    // hands a stranger the first and last characters of a live secret.
+    await saveKey('openai', 'sk-platform-second-key-5555');
+    const leakBot = await (await fetch(`${BASE}/api/bots`, {
+      method: 'POST',
+      headers: adminHeaders,
+      body: JSON.stringify({
+        name: 'Leak Probe',
+        provider: 'openai',
+        // The sentinel model the fake provider always rejects.
+        model: 'gpt-4.1-mini',
+        greeting: 'hi',
+      }),
+    })).json();
+    await fetch(`${BASE}/api/admin/credits`, {
+      method: 'POST',
+      headers: adminHeaders,
+      body: JSON.stringify({ email: 'smoke@example.test', amount: 3 }),
+    });
+    const failing = await fetch(`${BASE}/api/chat/${leakBot.bot?.id}`, {
+      method: 'POST',
+      headers: adminHeaders,
+      body: JSON.stringify({ messages: [{ role: 'user', content: 'hello' }] }),
+    });
+    const failingText = await failing.text();
+    check('the upstream call really did fail', !failing.ok, `${failing.status}`);
+    check('an upstream failure on a platform key never quotes the key',
+      !/sk-platform/i.test(failingText), failingText.slice(0, 160));
+    check('the visitor gets a usable message instead',
+      /could not reach the model/i.test(failingText), failingText.slice(0, 160));
+    await fetch(`${keysUrl}?provider=openai`, { method: 'DELETE', headers: adminHeaders });
+    await fetch(`${BASE}/api/bots/${leakBot.bot?.id}`, { method: 'DELETE', headers: adminHeaders });
+
     /* ---------------- account recovery ---------------- */
     console.log('\nPassword reset');
 
@@ -882,6 +927,8 @@ async function main() {
 
     // The webhook is the only route that turns money into credits, so an
     // unsigned call to it must go nowhere.
+    const creditsBeforeForgery = (await (await fetch(`${BASE}/api/auth/me`, { headers: adminHeaders })).json()).user
+      ?.credits;
     const unsignedHook = await fetch(`${BASE}/api/billing/webhook`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -895,7 +942,8 @@ async function main() {
 
     const creditsAfterForgery = (await (await fetch(`${BASE}/api/auth/me`, { headers: adminHeaders })).json()).user
       ?.credits;
-    check('the forged webhook granted nothing', creditsAfterForgery === after);
+    check('the forged webhook granted nothing', creditsAfterForgery === creditsBeforeForgery,
+      `before=${creditsBeforeForgery} after=${creditsAfterForgery}`);
 
     const history = await (await fetch(`${BASE}/api/billing/history`, { headers: adminHeaders })).json();
     check('the credit ledger is readable by its owner', Array.isArray(history.entries));

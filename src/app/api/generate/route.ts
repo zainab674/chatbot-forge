@@ -121,6 +121,14 @@ export async function POST(req: NextRequest) {
   } catch (e: any) {
     // Charged before the call, so nothing was delivered for the credits taken.
     if (platformUserId && charged) await refundCredits(platformUserId, charged, 'generate failed');
+
+    // Same rule as the chat route: a provider's error text describes the key it
+    // rejected, and on the platform's key that is not the caller's to read.
+    if (!ownKey) {
+      console.error('[chatbot-forge] platform-key generate failure:', provider.id, model, e?.message);
+      return fail('Could not reach the model just now. Try again, or add your own API key.', 502);
+    }
+
     if (e instanceof UpstreamError) return fail(e.message, e.status >= 400 && e.status < 600 ? e.status : 502);
     return fail(e?.message ?? 'Could not reach the model provider.', 502);
   }

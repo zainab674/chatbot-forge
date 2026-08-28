@@ -313,6 +313,20 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     // The upstream call never produced an answer, so nothing was delivered for
     // the credits taken above.
     await refund('upstream error');
+
+    // A provider's error body is useful when it is the creator's own key that
+    // was rejected — it names the problem. On a platform key it is somebody
+    // else's diagnostic, sent to a stranger: OpenAI's 401 quotes the key it
+    // rejected in masked form, which handed an anonymous visitor the first and
+    // last characters of the platform's key and confirmation that one exists.
+    if (onPlatformKey) {
+      console.error('[chatbot-forge] platform-key upstream failure:', doc.provider, doc.model, e?.message);
+      return fail(
+        'This chatbot could not reach the model just now. Its owner may need to check their credits, or add their own API key.',
+        502,
+      );
+    }
+
     if (e instanceof UpstreamError) return fail(e.message, e.status >= 400 && e.status < 600 ? e.status : 502);
     return fail(e?.message ?? 'Could not reach the model provider.', 502);
   }

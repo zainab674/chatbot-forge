@@ -352,7 +352,7 @@ Still open, and worth knowing about:
 npm run typecheck      # tsc --noEmit
 npm test               # 237 unit and adapter tests, no DB needed
 npm run test:knowledge # 128 knowledge base tests
-npm run test:e2e       # 117 end-to-end HTTP checks against a real server
+npm run test:e2e       # 120 end-to-end HTTP checks against a real server
 npm run test:visual    # 41 browser checks in Chromium, writes screenshots/
 npm run test:nav       # 37 navigation checks in Chromium
 npm run test:all       # all of the above
