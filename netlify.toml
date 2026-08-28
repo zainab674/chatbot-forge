@@ -1,0 +1,36 @@
+[build]
+  command = "npm run build"
+  # The publish directory is deliberately not set. Netlify's Next.js runtime
+  # configures it, and pinning it here is the usual cause of a first deploy
+  # failing with "page not found" after an otherwise green build.
+
+[build.environment]
+  # Netlify's Next.js runtime is installed automatically; pinning it is
+  # discouraged. Only the Node version is worth fixing here.
+  NODE_VERSION = "20"
+
+  # Netlify buffers request bodies at 6MB, and binary uploads are base64-encoded
+  # on the way in, which costs about 30%. Anything above ~4MB is rejected by the
+  # platform before the app ever sees it, so the uploader is told the real limit.
+  NEXT_PUBLIC_MAX_UPLOAD_MB = "4"
+
+  # Netlify functions stop at 60 seconds and this cannot be raised. Ingestion
+  # stops crawling a few seconds before that and indexes what it has, rather
+  # than dying with nothing, so this is the budget it works to.
+  INGEST_BUDGET_MS = "50000"
+
+[[headers]]
+  for = "/widget.js"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"
+    Cache-Control = "public, max-age=300"
+
+# Everything else (routing, functions, streaming) is handled by Netlify's
+# Next.js runtime. Environment variables that must NOT live in this file, and
+# should be set under Site configuration > Environment variables instead:
+#
+#   MONGODB_URI          required, the app cannot store anything without it
+#   MONGODB_DB           e.g. chatbot_forge
+#   ENCRYPTION_SECRET    required, 32+ random chars, encrypts creators' API keys
+#   NEXT_PUBLIC_APP_URL  your final site URL, used in the embed snippets
+#   MONGODB_VECTOR_INDEX optional, name of an Atlas Vector Search index

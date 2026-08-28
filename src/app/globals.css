@@ -1,0 +1,1566 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+  Clarity — an editorial calm, not a dashboard.
+
+  Charcoal speaks, sand warms, cream holds everything. Headings are a
+  high-contrast serif at normal weight; anything that labels rather than speaks
+  is small, uppercase and widely tracked. Corners stay effectively square —
+  2–3px, enough to soften a border join and nothing more.
+
+  Revised: the first pass banned depth outright — every surface a flat fill on
+  a flat ground — and the result read as inert rather than calm. Depth is back,
+  but as paper, not as chrome: shadows are tinted with the ink and paired with
+  a 1px contact edge so a card looks like a sheet resting on the cream, the
+  ground carries a faint grain so it stops looking like dead beige, and
+  anything clickable answers with a lift. Still no glows, still no decorative
+  gradients — the only two in the file are a hairline-thin warm wash behind the
+  masthead and the grain itself.
+*/
+
+:root {
+  --ink: #2a302c;
+  --ink-2: #4a4841;
+  --ink-3: #807b70;
+  --line: #e7e1d5;
+  --line-strong: #d3ccbe;
+  --paper: #ffffff;
+  --cream: #f4f0e8;
+  --cream-deep: #ede6d9;
+  --sand: #e3c89b;
+  --sand-soft: #f7eedd;
+  --bronze: #7e5c2d;
+  --clay: #b96143;
+  --ochre: #bf9134;
+  --sage: #6e875a;
+  /* Kept as variables so `.grad-bg` and friends still resolve; Clarity paints
+     them flat, because the reference has no gradient anywhere. */
+  --grad: linear-gradient(#2a302c, #2a302c);
+  --grad-warm: linear-gradient(#e3c89b, #e3c89b);
+  /* A single, very low shadow. Anything stronger fights the hairlines. */
+  --shadow: 0 18px 40px -34px rgba(42, 48, 44, 0.5);
+  --shadow-sm: 0 8px 20px -18px rgba(42, 48, 44, 0.45);
+  /* Per-bot accent, overridden inline by the chat surface. */
+  --accent: #2a302c;
+  /* Bronze, promoted from decoration to the interaction colour: it marks
+     links, focus rings and the rules under a section head, so the eye has one
+     warm thing to follow through the whole product. */
+  --action: #7e5c2d;
+  --action-soft: #f7eedd;
+  /* A grain, not a texture — 3.5% noise over the cream. Enough that a large
+     empty area has something in it, not enough to read as a pattern. */
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.038'/%3E%3C/svg%3E");
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  @apply text-slate-900 antialiased;
+  /* Cream, grained. The grain is fixed to the viewport so it behaves like the
+     tooth of the paper rather than something that scrolls with the content;
+     the single wash sits under the masthead so the top of every page has a
+     little more light in it than the bottom. */
+  background-color: #f4f0e8;
+  background-image: var(--grain), radial-gradient(120% 60% at 50% -10%, rgba(255, 253, 248, 0.9), transparent 70%);
+  background-attachment: fixed, fixed;
+}
+
+@layer base {
+  /* Every heading is the display serif at normal weight. Individual screens
+     still set their own size, so this only claims family and weight — that is
+     what carries the look into screens this file never mentions. */
+  h1,
+  h2,
+  h3 {
+    @apply font-serif font-normal;
+    letter-spacing: -0.01em;
+  }
+
+  /* The template resolves state by weight of line and never by a halo, which
+     left keyboard users with no focus indicator at all. `:focus-visible` puts
+     one back for exactly them — a pointer click still shows nothing. */
+  :focus-visible {
+    outline: 2px solid var(--action);
+    outline-offset: 2px;
+    border-radius: 1px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-up,
+  .animate-fade-down,
+  .animate-step-in,
+  .animate-rise,
+  .animate-dot-bounce {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  /* The lift-on-hover is the other half of the depth pass; shadows still
+     change, only the movement stops. */
+  a.card:hover,
+  button.card:hover,
+  .btn:hover,
+  .btn:active,
+  .pill:hover,
+  .chip:hover {
+    transform: none !important;
+  }
+}
+
+.thin-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.thin-scroll::-webkit-scrollbar-thumb {
+  @apply bg-slate-300;
+}
+.thin-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.dark .thin-scroll::-webkit-scrollbar-thumb {
+  @apply bg-slate-600;
+}
+
+@layer components {
+
+/* ================= type helpers ================= */
+
+/* Charcoal fill, kept under the old names so the logo mark and the warm
+   header strip in the builder need no rewiring. */
+.grad-bg {
+  @apply bg-slate-900;
+}
+.grad-warm-bg {
+  @apply bg-accent-300 text-slate-900;
+}
+
+/* Was a gradient-clipped word. In Clarity, emphasis leans instead of glows:
+   the highlighted word turns serif italic in bronze, which is exactly the
+   "Achieve Balance and Harmony" move from the reference. */
+.text-gradient {
+  @apply font-serif font-normal italic text-accent-700;
+  letter-spacing: 0;
+}
+
+/* Small, uppercase, widely tracked — the template's caption voice.
+   Named `kicker` (the editorial term) rather than `overline`, because Tailwind
+   ships an `overline` text-decoration utility: it is emitted after the
+   components layer, so it won at equal specificity and drew a literal rule
+   above every caption on the site. */
+.kicker {
+  @apply text-[11px] font-medium uppercase tracking-label text-slate-500;
+}
+
+/* The top of a page. Everything used to top out around 2x body, so no line
+   ever felt like an opening statement; `display` is 3-5x and fluid, and the
+   negative tracking is what keeps a serif that large from sprawling. */
+.display {
+  @apply font-serif text-display font-normal;
+}
+.display-sm {
+  @apply font-serif text-display-sm font-normal;
+}
+/* The paragraph that follows a display line — wider measure, more air. */
+.lede {
+  @apply max-w-[58ch] text-lede font-light text-slate-600;
+}
+
+/* A section opener: tracked label, bronze rule, serif line. The rule is what
+   gives a long page its rhythm — without it every section started identically
+   and the page read as one undifferentiated column. */
+.section-head {
+  @apply mb-8 flex flex-col gap-3;
+}
+.section-rule {
+  @apply h-px w-10 bg-accent-600;
+}
+
+/* Inline text link: bronze, with the underline growing in rather than
+   appearing. */
+.link {
+  @apply font-medium text-accent-700 underline decoration-accent-300 decoration-1 underline-offset-4 transition duration-200 ease-editorial;
+}
+.link:hover {
+  @apply decoration-accent-700;
+}
+
+/* ================= the app frame ================= */
+
+/* The builder sits in its own sheet: rail, stage, footer. Hairline, not card. */
+.app-frame {
+  @apply overflow-hidden rounded-card border border-slate-300 bg-white;
+}
+
+/* ---- step rail ---- */
+.rail {
+  @apply flex items-center overflow-x-auto border-b border-slate-200 bg-slate-50 px-6 py-4;
+}
+.rail-step {
+  @apply flex flex-none items-center gap-2.5;
+}
+.rail-bub {
+  @apply grid h-8 w-8 flex-none place-items-center rounded-control border border-slate-300 bg-white font-serif text-[13px] text-slate-500 transition;
+}
+.rail-lbl {
+  @apply text-[11px] font-medium uppercase tracking-wide text-slate-500 transition;
+}
+.rail-step.is-done .rail-bub {
+  @apply border-emerald-600 bg-emerald-50 text-emerald-700;
+}
+.rail-step.is-done .rail-lbl {
+  @apply text-slate-600;
+}
+.rail-step.is-now .rail-bub {
+  @apply border-slate-900 bg-slate-900 text-white;
+}
+.rail-step.is-now .rail-lbl {
+  @apply text-slate-900;
+}
+.rail-connect {
+  @apply mx-1 h-px min-w-[10px] flex-1 bg-slate-300 sm:mx-3 sm:min-w-[14px];
+}
+.rail-connect.is-filled {
+  @apply bg-slate-900;
+}
+
+/* ---- stage ---- */
+.stage {
+  @apply grid;
+  grid-template-columns: minmax(0, 1fr) 352px;
+}
+.stage-solo {
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (max-width: 1023px) {
+  .stage {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.panel {
+  @apply min-w-0 px-6 py-10 sm:px-10;
+}
+
+/* The eyebrow is a rule plus a tracked label — the "WELCOME TO CLARITY"
+   device that sits above every heading in the reference. */
+.eyebrow {
+  @apply mb-4 inline-flex items-center gap-3 text-[11px] font-medium uppercase tracking-label text-accent-700;
+}
+.eyebrow-bar {
+  @apply h-px w-8 bg-accent-600;
+}
+.h-step {
+  @apply font-serif text-[34px] font-normal leading-[1.14] sm:text-[38px];
+  letter-spacing: -0.015em;
+}
+.sub-step {
+  @apply mt-3.5 max-w-[56ch] text-[15px] font-light leading-[1.75] text-slate-600;
+}
+
+/* ---- form controls ---- */
+.field-label {
+  @apply mb-2.5 block text-[11px] font-medium uppercase tracking-wide text-slate-900;
+}
+.field-hint {
+  @apply ml-2 text-[11px] font-normal normal-case tracking-normal text-slate-600;
+}
+.input {
+  @apply w-full rounded-control border border-slate-300 bg-white px-4 py-3 text-[15px] font-light text-slate-900 outline-none transition placeholder:text-slate-400;
+}
+.input:hover:not(:focus) {
+  @apply border-slate-400;
+}
+.input:focus {
+  /* No ring. The border simply goes to charcoal — the whole template resolves
+     state by weight of line, never by a halo. */
+  @apply border-slate-900;
+}
+.input-mono {
+  @apply font-mono text-[13px];
+}
+.hint {
+  @apply mt-2 text-[12px] leading-relaxed text-slate-600;
+}
+
+/* ---- pills & buttons ---- */
+.pill {
+  @apply inline-flex items-center gap-2 whitespace-nowrap rounded-control border border-slate-300 bg-transparent px-3.5 py-2 text-[10.5px] font-medium uppercase tracking-wide text-slate-700 transition duration-200 ease-editorial;
+}
+.pill:hover {
+  @apply -translate-y-px border-slate-900 text-slate-900 shadow-lift;
+}
+.pill-on {
+  @apply border-slate-900 bg-slate-900 text-white;
+}
+.pill-save {
+  @apply border-emerald-600 bg-transparent text-emerald-700;
+}
+.pill .ping {
+  @apply block h-[5px] w-[5px] rounded-full bg-current;
+}
+
+/* Buttons are rectangles with tracked capitals — the "INQUIRE NOW" /
+   "EXPLORE SERVICES" device. No radius to speak of, no shadow at all. */
+.btn {
+  @apply inline-flex cursor-pointer items-center justify-center gap-2.5 rounded-control px-7 py-3.5 text-[11px] font-medium uppercase tracking-label transition duration-200 ease-editorial disabled:cursor-not-allowed disabled:opacity-60;
+}
+/* Every button takes the press, so a click has a physical answer even on the
+   ghost and danger variants that carry no shadow. */
+.btn:active:not(:disabled) {
+  @apply translate-y-px;
+}
+.btn-primary {
+  @apply btn border border-slate-900 bg-slate-900 text-white shadow-lift;
+}
+.btn-primary:hover:not(:disabled) {
+  @apply -translate-y-0.5 bg-slate-800 shadow-lift-md;
+}
+.btn-warm {
+  @apply btn border border-accent-300 bg-accent-300 text-slate-900 shadow-lift;
+}
+.btn-warm:hover:not(:disabled) {
+  @apply -translate-y-0.5 border-accent-400 bg-accent-400 shadow-lift-md;
+}
+.btn-ghost {
+  @apply btn border border-slate-400 bg-transparent text-slate-800;
+}
+.btn-ghost:hover:not(:disabled) {
+  @apply border-slate-900 bg-slate-900 text-white;
+}
+.btn-dark {
+  @apply btn border border-slate-900 bg-slate-900 text-white;
+}
+.btn-dark:hover:not(:disabled) {
+  @apply bg-transparent text-slate-900;
+}
+.btn-danger {
+  @apply btn border border-red-300 bg-transparent text-red-700;
+}
+.btn-danger:hover:not(:disabled) {
+  @apply border-red-600 bg-red-600 text-white;
+}
+
+/* ---- site navigation ---- */
+/* Header links are labels, not buttons: a rule under the active one is the
+   only chrome they get, so the masthead stays a masthead and the one dark
+   button beside them keeps being the only thing that looks pressable. Without
+   this the header gave no answer to "which page am I on". */
+.navlink {
+  @apply relative whitespace-nowrap rounded-control px-3 py-2.5 text-[11px] font-medium uppercase tracking-label text-slate-600 transition duration-200 ease-editorial;
+}
+.navlink::after {
+  content: '';
+  @apply pointer-events-none absolute inset-x-3 bottom-1 h-px origin-left scale-x-0 bg-accent-600 transition-transform duration-200 ease-editorial;
+}
+.navlink:hover {
+  @apply text-slate-900;
+}
+.navlink:hover::after,
+.navlink-on::after {
+  @apply scale-x-100;
+}
+.navlink-on {
+  @apply text-slate-900;
+}
+
+/* Identity and balance in one target, so "am I signed in, and on what" is
+   answered by the header rather than by opening /account to find out. */
+.navchip {
+  @apply inline-flex items-center gap-2.5 rounded-control border border-slate-300 bg-white/70 py-1.5 pl-1.5 pr-3 transition duration-200 ease-editorial;
+}
+.navchip:hover {
+  @apply -translate-y-px border-slate-900 shadow-lift;
+}
+.navchip-av {
+  @apply grid h-7 w-7 flex-none place-items-center rounded-control bg-slate-900 font-serif text-[13px] uppercase leading-none text-white;
+}
+.navchip-mail {
+  @apply block max-w-[14ch] truncate text-[12px] font-medium leading-none text-slate-900;
+}
+.navchip-sub {
+  @apply mt-1 block text-[9.5px] font-medium uppercase tracking-wide leading-none text-slate-500;
+}
+
+/* Below md the same links are disclosed instead of crammed. */
+.navtoggle {
+  @apply grid h-10 w-10 flex-none place-items-center rounded-control border border-slate-300 text-slate-800 transition duration-200 ease-editorial;
+}
+.navtoggle:hover {
+  @apply border-slate-900;
+}
+.navsheet {
+  @apply flex animate-fade-down flex-col gap-1 border-t border-slate-200 bg-[#f4f0e8] px-5 py-4 sm:px-6;
+}
+.navsheet-link {
+  @apply flex items-center justify-between gap-3 rounded-control border border-transparent px-3.5 py-3 text-[11px] font-medium uppercase tracking-label text-slate-600 transition duration-200 ease-editorial;
+}
+.navsheet-link:hover {
+  @apply border-slate-300 text-slate-900;
+}
+.navsheet-link.is-on {
+  @apply border-slate-300 bg-white text-slate-900;
+}
+
+/* ---- page headers ---- */
+/* Every interior page opens the same way — where you came from, what this
+   page is, what you can do on it — in that order and on the same measure, so
+   moving between them does not feel like moving between products. */
+.crumb {
+  @apply inline-flex items-center gap-2 text-[11px] font-medium uppercase tracking-label text-slate-500 transition duration-200 ease-editorial;
+}
+.crumb:hover {
+  @apply text-slate-900;
+}
+.crumb-arrow {
+  @apply inline-block transition-transform duration-200 ease-editorial;
+}
+.crumb:hover .crumb-arrow {
+  @apply -translate-x-1;
+}
+.page-head {
+  @apply flex flex-wrap items-end justify-between gap-x-6 gap-y-5 border-b border-slate-200 pb-6;
+}
+.page-title {
+  @apply font-serif text-[30px] font-normal leading-[1.14] tracking-[-0.02em] text-slate-900 sm:text-[36px];
+}
+.page-sub {
+  @apply mt-2.5 max-w-[62ch] text-[14px] font-light leading-[1.7] text-slate-600;
+}
+.page-actions {
+  @apply flex flex-wrap items-center gap-2.5;
+}
+
+/* ---- footer nav ---- */
+.footbar {
+  @apply flex items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 px-6 py-4;
+}
+.dots {
+  @apply flex items-center gap-2;
+}
+.dots i {
+  @apply block h-px w-4 bg-slate-300;
+}
+.dots i.is-done {
+  @apply bg-slate-400;
+}
+.dots i.is-now {
+  @apply w-8 bg-slate-900;
+}
+
+/* ---- tiles ---- */
+.tile {
+  @apply relative flex items-start gap-3.5 rounded-panel border border-slate-300 bg-white p-5 text-left transition;
+}
+.tile:hover {
+  @apply border-slate-500;
+}
+.tile-ic {
+  @apply grid h-9 w-9 flex-none place-items-center rounded-control bg-accent-100 text-[17px];
+}
+.tile-on {
+  @apply border-slate-900 bg-accent-50;
+}
+.tile-on::after {
+  content: '✓';
+  @apply absolute right-0 top-0 grid h-5 w-5 place-items-center bg-slate-900 text-[11px] font-normal text-white;
+}
+
+/* ---- swatches & avatars ---- */
+.sw {
+  @apply relative h-9 w-9 rounded-control border border-transparent transition;
+}
+.sw-on {
+  @apply border-slate-900;
+  box-shadow: 0 0 0 2px #fff inset;
+}
+.av {
+  @apply grid h-11 w-11 place-items-center rounded-control border border-slate-300 bg-white text-[19px] transition;
+}
+.av:hover {
+  @apply border-slate-500;
+}
+.av-on {
+  @apply border-slate-900 bg-accent-50;
+}
+
+/* ---- sliders ---- */
+.slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 1px;
+  outline: none;
+  cursor: pointer;
+  background: linear-gradient(90deg, #2a302c 0%, #2a302c var(--pct, 40%), #d3ccbe var(--pct, 40%), #d3ccbe 100%);
+}
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  height: 14px;
+  width: 14px;
+  border-radius: 0;
+  background: #2a302c;
+  border: none;
+}
+.slider::-moz-range-thumb {
+  height: 14px;
+  width: 14px;
+  border-radius: 0;
+  background: #2a302c;
+  border: none;
+}
+.slider-ends {
+  @apply mt-3 flex justify-between text-[10.5px] font-medium uppercase tracking-wide text-slate-500;
+}
+
+/* ---- prompt editor ---- */
+/* The one deliberately dark panel, matching the charcoal hero block. */
+.editor {
+  @apply overflow-hidden rounded-panel border border-slate-900 bg-slate-900;
+}
+.editor-top {
+  @apply flex items-center justify-between border-b border-white/10 bg-slate-950 px-4 py-3;
+}
+.editor-tag {
+  @apply text-[10.5px] font-medium uppercase tracking-label text-accent-300;
+}
+.editor-area {
+  @apply block w-full resize-y border-0 bg-transparent px-5 py-4 font-mono text-[12.4px] leading-[1.8] text-slate-100 outline-none;
+  min-height: 240px;
+}
+.editor-area::placeholder {
+  color: #807b70;
+}
+.meter-track {
+  @apply h-px flex-1 overflow-hidden bg-slate-300;
+}
+.meter-fill {
+  @apply h-full bg-slate-900;
+}
+.meter-n {
+  @apply font-mono text-[11px] text-slate-500;
+}
+
+/* ---- dropzone, files, pinned answers ---- */
+.drop {
+  @apply flex items-center gap-4 rounded-panel border border-dashed border-slate-400 bg-slate-50 p-5 transition;
+}
+.drop-over {
+  @apply border-slate-900 bg-accent-50;
+}
+.drop-ic {
+  @apply grid h-11 w-11 flex-none place-items-center rounded-control border border-slate-300 bg-white text-[19px];
+}
+.filerow {
+  @apply mt-2.5 flex items-center gap-3 rounded-control border border-slate-300 bg-white px-4 py-3;
+}
+.qa {
+  @apply mt-2.5 rounded-control border border-slate-300 bg-white px-4 py-3;
+}
+.qa-tag {
+  @apply border border-red-300 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-red-700;
+}
+.addrow {
+  @apply mt-2.5 w-full rounded-control border border-dashed border-slate-300 p-3.5 text-center text-[10.5px] font-medium uppercase tracking-wide text-slate-500 transition hover:border-slate-900 hover:text-slate-900;
+}
+
+/* ---- provider cards ---- */
+.prov {
+  @apply rounded-panel border border-slate-300 bg-white px-3 py-4 text-center transition;
+}
+.prov:hover {
+  @apply border-slate-500;
+}
+.prov-lg {
+  @apply mx-auto mb-2.5 grid h-9 w-9 place-items-center rounded-control font-serif text-[15px] text-white;
+}
+.prov-on {
+  @apply border-slate-900 bg-accent-50;
+}
+.okpill {
+  @apply inline-flex items-center gap-2 whitespace-nowrap rounded-control border border-emerald-600 bg-transparent px-3.5 py-2 text-[10.5px] font-medium uppercase tracking-wide text-emerald-700;
+}
+/* Notes are a left rule and a line of text, not a filled alert box. */
+.note-strip {
+  @apply mt-6 flex items-start gap-3.5 border-l-2 border-sky-400 bg-sky-50 px-4 py-3.5;
+}
+.note-strip p {
+  @apply m-0 text-[13px] font-light leading-relaxed text-sky-900;
+}
+.note-strip.is-warm {
+  @apply border-amber-400 bg-amber-50;
+}
+.note-strip.is-warm p {
+  @apply text-amber-900;
+}
+
+/* ---- preview column ---- */
+.preview {
+  @apply flex flex-col gap-4 border-l border-slate-200 bg-slate-50 px-6 py-8;
+}
+@media (max-width: 1023px) {
+  .preview {
+    @apply border-l-0 border-t;
+  }
+}
+.preview-t {
+  @apply text-[10.5px] font-medium uppercase tracking-label text-slate-500;
+}
+.seg {
+  @apply flex rounded-control border border-slate-300 bg-white p-0.5;
+}
+.seg b {
+  @apply rounded-none px-3 py-1 text-[10px] font-medium uppercase tracking-wide text-slate-500;
+}
+.seg b.on {
+  @apply bg-slate-900 text-white;
+}
+.chatwin {
+  @apply flex min-h-0 flex-col overflow-hidden rounded-panel border border-slate-300 bg-white;
+}
+.side-card {
+  @apply overflow-hidden rounded-panel border border-slate-300 bg-white;
+}
+.side-card-top {
+  @apply flex items-center gap-3 px-4 py-3.5 text-white;
+}
+.side-cav {
+  @apply grid h-8 w-8 place-items-center rounded-control bg-white/20 text-[15px];
+}
+.preview-foot {
+  @apply text-center text-[10.5px] font-normal uppercase tracking-wide text-slate-500;
+}
+
+/* ---- spark step ---- */
+.bigbox {
+  @apply mx-auto max-w-[760px] rounded-panel border border-slate-400 bg-white px-7 pb-5 pt-6 text-left;
+}
+.bigbox-area {
+  @apply block w-full resize-none border-0 bg-transparent text-[17px] font-light leading-[1.7] text-slate-900 outline-none placeholder:text-slate-400;
+  min-height: 104px;
+}
+.bigbox-bar {
+  @apply mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4;
+}
+.mini-tag {
+  @apply text-[10.5px] font-medium uppercase tracking-wide text-slate-500;
+}
+.chip {
+  @apply inline-flex items-center gap-2 rounded-control border border-slate-300 bg-transparent px-4 py-2.5 text-[10.5px] font-medium uppercase tracking-wide text-slate-700 transition duration-200 ease-editorial;
+}
+.chip:hover {
+  @apply -translate-y-px border-slate-900 text-slate-900 shadow-lift;
+}
+.chip-hot {
+  @apply border-accent-400 bg-accent-100 text-accent-800;
+}
+
+/* ---- ship step ---- */
+/* The sand block — the reference's "Tailored Support" band, used here for the
+   one moment worth celebrating. */
+.ship-hero {
+  @apply mb-8 flex flex-wrap items-center gap-5 rounded-panel bg-accent-200 p-7;
+}
+.ship-big {
+  @apply grid h-12 w-12 flex-none place-items-center rounded-control bg-slate-900 text-xl text-white;
+}
+.shipcard {
+  @apply rounded-panel border border-slate-300 bg-white p-5;
+}
+.shipcard-ic {
+  @apply grid h-8 w-8 flex-none place-items-center rounded-control border border-slate-300 text-[15px];
+}
+.tagx {
+  @apply ml-auto text-[10px] font-medium uppercase tracking-wide text-slate-500;
+}
+.urlbox {
+  @apply flex items-center gap-3 rounded-control border border-slate-300 bg-slate-50 px-4 py-3;
+}
+.urlbox code {
+  @apply overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[12.5px] text-slate-700;
+}
+.codeblk {
+  @apply overflow-x-auto rounded-control bg-slate-900 px-4 py-3.5;
+}
+.codeblk pre {
+  @apply m-0 whitespace-pre font-mono text-[12.2px] leading-[1.7] text-slate-100;
+}
+
+/* ================= markdown in chat bubbles ================= */
+
+.msg p {
+  @apply my-1.5 first:mt-0 last:mb-0;
+}
+.msg ul,
+.msg ol {
+  @apply my-2 space-y-1 pl-5;
+}
+.msg ul {
+  @apply list-disc;
+}
+.msg ol {
+  @apply list-decimal;
+}
+.msg code {
+  @apply rounded bg-black/10 px-1 py-0.5 font-mono text-[0.85em];
+}
+.msg pre {
+  @apply my-2 overflow-x-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100;
+}
+.msg pre code {
+  @apply bg-transparent p-0 text-inherit;
+}
+.msg a {
+  @apply underline underline-offset-2;
+}
+
+/* Legacy aliases: other screens still use these names. */
+.card {
+  @apply rounded-card border border-slate-200 bg-white p-6 shadow-lift transition duration-300 ease-editorial sm:p-7;
+}
+/* A card that is a link or a button answers the pointer; a card that is only a
+   container stays put. Keying off the element rather than a modifier class
+   means every clickable card already in the app got this without being
+   touched. */
+a.card,
+button.card {
+  @apply cursor-pointer;
+}
+a.card:hover,
+button.card:hover {
+  @apply -translate-y-0.5 border-slate-300 shadow-lift-lg;
+}
+a.card:active,
+button.card:active {
+  @apply translate-y-0 shadow-lift;
+}
+.field {
+  @apply input;
+}
+.label {
+  @apply field-label;
+}
+
+/* ================= landing page ================= */
+
+/* The hero is the one charcoal block on a cream site, so it has to earn the
+   contrast: grain over the fill so it is not a dead rectangle, a sand hairline
+   along the bottom where it meets the cream, and its own soft cast. */
+.hero {
+  @apply relative overflow-hidden rounded-card bg-slate-900 shadow-lift-lg;
+  border-bottom: 2px solid #c79a55;
+}
+.hero::before {
+  content: '';
+  @apply pointer-events-none absolute inset-0;
+  background-image: var(--grain), radial-gradient(90% 70% at 12% 0%, rgba(227, 200, 155, 0.14), transparent 65%);
+  opacity: 1;
+}
+.hero > * {
+  @apply relative;
+}
+
+/* ---- the fresco hero ---- */
+/* The charcoal block above is still here for any screen that wants it, but the
+   landing page now opens on a painted ceiling instead: warm plaster, an arch,
+   and two machines reaching for each other. The copy sits centred on top, so
+   everything in here exists to keep dark ink legible over a light painting. */
+/* Narrow screens stack — copy on plaster, painting as a band beneath it — so
+   the content sits at the top rather than centred over the figures. From `sm`
+   up the painting covers the whole block and the copy centres on it. */
+.hero-fresco {
+  @apply relative isolate flex flex-col items-center justify-start overflow-hidden rounded-card text-center shadow-lift-lg sm:justify-center;
+  background-color: #e9d6b1;
+  border-bottom: 2px solid #c79a55;
+}
+/* The scrim: brightest exactly where the headline lands, gone by the edges, so
+   it lifts the text without washing the painting into fog. */
+.hero-fresco::before {
+  content: '';
+  @apply pointer-events-none absolute inset-0 -z-[1];
+  background:
+    radial-gradient(54% 44% at 50% 42%, rgba(253, 247, 233, 0.72), rgba(250, 240, 220, 0.3) 58%, transparent 80%),
+    linear-gradient(to bottom, rgba(255, 251, 240, 0.28), transparent 30%);
+}
+/* A hairline of plaster texture over the whole thing, matching the page grain
+   so the hero and the cream around it read as one sheet of paper. */
+.hero-fresco::after {
+  content: '';
+  @apply pointer-events-none absolute inset-0 -z-[1];
+  background-image: var(--grain);
+  opacity: 0.55;
+}
+/* The painting itself sits a layer below both overlays; the copy sits well
+   above all three. `isolate` on the parent is what keeps these negatives from
+   escaping behind the section's own background. */
+.hero-fresco > * {
+  @apply relative z-10;
+}
+/* The painting is bottom-anchored, so on a narrow screen it becomes a band and
+   this gradient is the plaster above it. Its last stop is the exact colour of
+   the artwork's top row, which is what makes the join invisible. */
+.hero-fresco > .fresco-plate {
+  @apply pointer-events-none absolute inset-0 -z-[2] overflow-hidden;
+  background:
+    radial-gradient(62% 46% at 50% 36%, rgba(255, 249, 231, 0.85), transparent 72%),
+    linear-gradient(to bottom, #fcf6e8, #f7eed9 82%, #f7eed9);
+}
+/* Ink on plaster: the faint warm halo behind each glyph is what holds the
+   headline together where it crosses a bright cloud. */
+.fresco-ink {
+  text-shadow: 0 1px 0 rgba(255, 252, 243, 0.6), 0 0 26px rgba(255, 248, 228, 0.9);
+}
+
+/* The provider row under the hero: names only, tracked out, no logos to chase
+   down or keep licensed. Proof that the "any model" claim is real. */
+.trust {
+  @apply flex flex-wrap items-center justify-center gap-x-8 gap-y-3 border-y border-slate-200 py-5;
+}
+.trust b {
+  @apply font-sans text-[11.5px] font-medium uppercase tracking-label text-slate-600;
+}
+
+/* ---- the chat mock ---- */
+/* A still of the product, built from the same parts as the real widget. It is
+   decoration, so it is aria-hidden in the markup — but it is the only place on
+   the landing page where a visitor sees what they are actually buying. */
+.mock {
+  @apply overflow-hidden rounded-panel border border-slate-700 bg-white shadow-lift-lg;
+}
+.mock-bar {
+  @apply flex items-center gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3;
+}
+.mock-dot {
+  @apply h-[7px] w-[7px] rounded-full bg-slate-300;
+}
+.mock-url {
+  @apply ml-2 flex-1 truncate rounded-control bg-white px-3 py-1 text-center font-mono text-[10.5px] text-slate-500;
+}
+.mock-body {
+  @apply flex flex-col gap-3 px-5 py-6;
+}
+.mock-row {
+  @apply flex items-end gap-2.5;
+}
+.mock-av {
+  @apply grid h-7 w-7 flex-none place-items-center rounded-control bg-accent-100 text-[13px];
+}
+.mock-bot {
+  @apply max-w-[80%] rounded-panel bg-slate-100 px-3.5 py-2.5 text-[13px] font-light leading-relaxed text-slate-800;
+}
+.mock-user {
+  @apply ml-auto max-w-[80%] rounded-panel bg-slate-900 px-3.5 py-2.5 text-[13px] font-light leading-relaxed text-white;
+}
+.mock-cite {
+  @apply mt-1.5 inline-flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wide text-accent-700;
+}
+.mock-typing {
+  @apply flex items-center gap-1 rounded-panel bg-slate-100 px-3.5 py-3;
+}
+.mock-typing i {
+  @apply block h-[5px] w-[5px] rounded-full bg-slate-500;
+  animation: dot-bounce 1.4s ease-in-out infinite;
+}
+.mock-typing i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.mock-typing i:nth-child(3) {
+  animation-delay: 0.3s;
+}
+.mock-foot {
+  @apply flex items-center gap-2 border-t border-slate-200 px-4 py-3;
+}
+.mock-input {
+  @apply flex-1 text-[12.5px] font-light text-slate-400;
+}
+.mock-send {
+  @apply grid h-7 w-7 place-items-center rounded-control bg-slate-900 text-[12px] text-white;
+}
+
+/* ---- the numbered three-up ---- */
+/* Was a hairline grid of flat white panels. Now each one is a sheet that
+   lifts, with the numeral doing the work the old 1px rule was doing. */
+.numcard {
+  @apply relative overflow-hidden rounded-card border border-slate-200 bg-white px-7 py-9 shadow-lift transition duration-300 ease-editorial;
+}
+.numcard:hover {
+  @apply -translate-y-1 shadow-lift-lg;
+}
+.numcard-n {
+  @apply font-serif text-[44px] font-normal leading-none text-accent-300 transition duration-300 ease-editorial;
+}
+.numcard:hover .numcard-n {
+  @apply text-accent-500;
+}
+
+
+/* ================= tones ================= */
+
+/*
+  Clarity is three colours, not one — charcoal speaks, sand warms, cream holds.
+  The reference alternates them down every page; this app was painting almost
+  everything cream-on-white, which is why long screens read as one
+  undifferentiated column no matter how good the type was.
+
+  A tone is a scope, not a skin. `.band` gives a section its padding and
+  corners; a `.tone-*` alongside it says which of the three it is painted in.
+  The point of doing it this way is that the components *inside* adapt on their
+  own: a `.card`, an `.input` or a `.pill` dropped into a charcoal band comes
+  out legible without the screen having to know it is on charcoal. That keeps
+  the mixing decision in the markup, where it is a layout choice, instead of
+  scattering one-off colour overrides through six screens.
+
+  Only `tone-ink` and `tone-sand` carry overrides. Cream and paper are what
+  every component was already designed against, so they need none.
+*/
+
+.band {
+  @apply relative overflow-hidden rounded-card px-7 py-12 sm:px-12 sm:py-16;
+}
+
+/* The grain again, so a large flat band has the same tooth as the page. */
+.band::before {
+  content: '';
+  @apply pointer-events-none absolute inset-0;
+  background-image: var(--grain);
+}
+.band > * {
+  @apply relative;
+}
+
+/* A tone on its own is a FILL and nothing else, so it can be dropped on a
+   nested block — a stat well, a note, a rail — without dragging a card's
+   border and shadow in with it. Elevation and edges are added back only where
+   the tone is also a sheet: a `.band` or a `.card`. */
+.tone-paper {
+  @apply bg-white;
+}
+.tone-cream {
+  @apply bg-[#f4f0e8];
+}
+.tone-sand {
+  @apply bg-accent-200;
+}
+.tone-ink {
+  @apply bg-slate-900;
+}
+
+.band.tone-paper,
+.card.tone-paper,
+.band.tone-cream,
+.card.tone-cream {
+  @apply border-slate-200 shadow-lift;
+}
+.band.tone-sand,
+.card.tone-sand {
+  @apply border-transparent shadow-lift;
+}
+.card.tone-ink {
+  @apply border-slate-800 shadow-lift-md;
+}
+/* Only a full band takes the sand hairline and the deeper cast — a tone on a
+   rail inside an existing frame is a fill, not a floating sheet, and an edge
+   there would read as a stray rule. */
+.band.tone-ink {
+  @apply border-transparent shadow-lift-lg;
+  border-bottom: 2px solid #c79a55;
+}
+
+/* ---- charcoal: invert the ink ---- */
+
+.tone-ink {
+  @apply text-slate-100;
+}
+.tone-ink h1,
+.tone-ink h2,
+.tone-ink h3 {
+  @apply text-white;
+}
+.tone-ink .kicker {
+  @apply text-accent-300;
+}
+.tone-ink .lede,
+.tone-ink .sub-step {
+  @apply text-slate-200;
+}
+.tone-ink .hint,
+.tone-ink .preview-foot,
+.tone-ink .preview-t,
+.tone-ink .mini-tag,
+.tone-ink .tagx,
+.tone-ink .slider-ends {
+  @apply text-slate-300;
+}
+.tone-ink .section-rule,
+.tone-ink .eyebrow-bar {
+  @apply bg-accent-400;
+}
+.tone-ink .eyebrow {
+  @apply text-accent-300;
+}
+.tone-ink .link {
+  @apply text-accent-300 decoration-accent-600;
+}
+.tone-ink .link:hover {
+  @apply decoration-accent-300;
+}
+
+/* Surfaces inside charcoal are lifted out of it rather than laid on it: a
+   translucent white so the band's grain still shows through, which is what
+   stops a nested card looking like a hole cut in the panel. */
+.tone-ink .card,
+.tone-ink .shipcard,
+.tone-ink .side-card,
+.tone-ink .tile,
+.tone-ink .numcard,
+.tone-ink .prov {
+  @apply border-white/10 bg-white/[0.05] text-slate-100 shadow-none;
+}
+.tone-ink a.card:hover,
+.tone-ink button.card:hover,
+.tone-ink .tile:hover,
+.tone-ink .prov:hover,
+.tone-ink .numcard:hover {
+  @apply border-white/25 bg-white/[0.08] shadow-none;
+}
+.tone-ink .tile-on,
+.tone-ink .prov-on,
+.tone-ink .av-on {
+  @apply border-accent-400 bg-white/10;
+}
+.tone-ink .tile-on::after {
+  @apply bg-accent-400 text-slate-900;
+}
+.tone-ink .tile-ic,
+.tone-ink .drop-ic {
+  @apply border-white/10 bg-white/10;
+}
+
+.tone-ink .input,
+.tone-ink .field {
+  @apply border-white/20 bg-white/[0.06] text-slate-100 placeholder:text-slate-400;
+}
+.tone-ink .input:hover:not(:focus),
+.tone-ink .field:hover:not(:focus) {
+  @apply border-white/40;
+}
+.tone-ink .input:focus,
+.tone-ink .field:focus {
+  @apply border-accent-300;
+}
+.tone-ink .field-label,
+.tone-ink .label {
+  @apply text-slate-100;
+}
+.tone-ink .field-hint {
+  @apply text-slate-300;
+}
+
+.tone-ink .pill,
+.tone-ink .chip {
+  @apply border-white/25 text-slate-200;
+}
+.tone-ink .pill:hover,
+.tone-ink .chip:hover {
+  @apply border-white bg-white/10 text-white shadow-none;
+}
+.tone-ink .pill-on {
+  @apply border-accent-300 bg-accent-300 text-slate-900;
+}
+
+/* The ghost button is the one that would vanish: on cream it is a dark
+   hairline, so on charcoal it has to become a light one. */
+.tone-ink .btn-ghost {
+  @apply border-white/45 bg-transparent text-white;
+}
+.tone-ink .btn-ghost:hover:not(:disabled) {
+  @apply border-white bg-white text-slate-900;
+}
+.tone-ink .btn-primary,
+.tone-ink .btn-dark {
+  @apply border-accent-300 bg-accent-300 text-slate-900;
+}
+.tone-ink .btn-primary:hover:not(:disabled),
+.tone-ink .btn-dark:hover:not(:disabled) {
+  @apply border-accent-200 bg-accent-200 text-slate-900;
+}
+.tone-ink .btn-danger {
+  @apply border-red-400/60 text-red-200;
+}
+.tone-ink .btn-danger:hover:not(:disabled) {
+  @apply border-red-400 bg-red-500 text-white;
+}
+
+/* Rules, dividers and the odd table inside a dark band. */
+.tone-ink .trust,
+.tone-ink table thead tr {
+  @apply border-slate-700;
+}
+.tone-ink .trust b,
+.tone-ink table thead tr {
+  @apply text-slate-300;
+}
+.tone-ink table tbody tr {
+  @apply border-white/10;
+}
+.tone-ink .urlbox,
+.tone-ink .filerow,
+.tone-ink .qa {
+  @apply border-white/15 bg-white/[0.06];
+}
+.tone-ink .urlbox code {
+  @apply text-slate-200;
+}
+.tone-ink .drop {
+  @apply border-white/25 bg-white/[0.04];
+}
+.tone-ink .drop-over {
+  @apply border-accent-300 bg-white/10;
+}
+.tone-ink .meter-track {
+  @apply bg-white/20;
+}
+.tone-ink .meter-fill {
+  @apply bg-accent-300;
+}
+/* The code block is already charcoal; on a charcoal band it needs an edge or
+   it disappears into the panel. */
+.tone-ink .codeblk {
+  @apply border border-white/15 bg-black/25;
+}
+.tone-ink .seg {
+  @apply border-white/20 bg-white/[0.06];
+}
+.tone-ink .seg b {
+  @apply text-slate-300;
+}
+.tone-ink .seg b.on {
+  @apply bg-accent-300 text-slate-900;
+}
+
+
+/* ---- sand: light, but warmer than cream ---- */
+
+/* Sand is light enough that the ink stays put; what changes is anything that
+   was tuned for white and now sits on a mid-warm fill. */
+.tone-sand .kicker {
+  @apply text-accent-800;
+}
+.tone-sand .lede,
+.tone-sand .hint,
+.tone-sand .sub-step {
+  @apply text-slate-700;
+}
+.tone-sand .section-rule,
+.tone-sand .eyebrow-bar {
+  @apply bg-accent-700;
+}
+.tone-sand .card,
+.tone-sand .shipcard,
+.tone-sand .tile,
+.tone-sand .numcard {
+  @apply border-accent-400/50 bg-white/70 shadow-none;
+}
+.tone-sand .input,
+.tone-sand .field {
+  @apply border-accent-500/40 bg-white/80;
+}
+.tone-sand .pill,
+.tone-sand .chip {
+  @apply border-slate-900/25 text-slate-800;
+}
+.tone-sand .pill:hover,
+.tone-sand .chip:hover {
+  @apply border-slate-900 bg-slate-900/5 text-slate-900;
+}
+.tone-sand .btn-ghost {
+  @apply border-slate-900/40;
+}
+.tone-sand .trust {
+  @apply border-accent-500/40;
+}
+
+}
+
+/* ================= tone remaps =================
+
+   Written as attribute selectors, not class selectors, and kept outside
+   @layer components. Both are deliberate: Tailwind parses any `.bg-slate-900`
+   selector as a *definition* of that utility, which makes every
+   `@apply bg-slate-900` elsewhere in this file circular and fails the
+   build. `[class~="bg-slate-900"]` matches exactly the same elements
+   without naming a utility. Specificity stays (0,2,0), so these still win
+   over the utilities they are correcting. */
+
+/* Inline muted greys are scattered through the app's markup, and a tone cannot
+   rewrite markup it has never seen. Remapping the handful that actually occur
+   is what makes a tone safe to drop onto an existing screen without auditing
+   every span inside it. These only match a literal utility in a className —
+   colours baked in via @apply are not class names, so the component rules
+   above stay in charge of their own elements. */
+.tone-ink [class~="text-slate-400"],
+.tone-ink [class~="text-slate-500"],
+.tone-ink [class~="text-slate-600"],
+.tone-ink [class~="text-slate-700"] {
+  color: #d3ccbe;
+}
+.tone-ink [class~="text-slate-800"],
+.tone-ink [class~="text-slate-900"] {
+  color: #f4f0e8;
+}
+.tone-ink [class~="bg-slate-50"],
+.tone-ink [class~="bg-slate-100"] {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+.tone-ink [class~="border-slate-100"],
+.tone-ink [class~="border-slate-200"],
+.tone-ink [class~="border-slate-300"] {
+  border-color: rgba(255, 255, 255, 0.15);
+}
+/* A charcoal fill on a charcoal band disappears, so anything that was using
+   the ink as its emphasis colour swaps to sand and inverts its text — an
+   active tab, a selected pill, a badge.
+
+   Code is the exception, and it has to be carved out rather than left to the
+   general rule: a snippet is not emphasis, it is a surface you read, and
+   flipping it to sand turns the one block on the screen that should recede
+   into the loudest thing on it. Those sink instead. */
+.tone-ink [class~="bg-slate-900"]:not(pre):not(code) {
+  background-color: #e3c89b;
+  color: #2a302c;
+}
+.tone-ink pre[class~="bg-slate-900"],
+.tone-ink code[class~="bg-slate-900"] {
+  background-color: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+.tone-ink [class~="border-slate-900"] {
+  border-color: #e3c89b;
+}
+
+.tone-sand [class~="text-slate-400"],
+.tone-sand [class~="text-slate-500"] {
+  color: #4a4841;
+}
+.tone-sand [class~="bg-slate-50"],
+.tone-sand [class~="bg-slate-100"] {
+  background-color: rgba(255, 255, 255, 0.6);
+}
+.tone-sand [class~="border-slate-100"],
+.tone-sand [class~="border-slate-200"] {
+  border-color: rgba(199, 154, 85, 0.35);
+}
+
+/* ================= animated chat themes =================
+
+   Backdrops for the themes that declare a `motion` in src/lib/themes.ts,
+   rendered by <ChatScene />. Everything here is decoration behind the
+   conversation: no pointer events, no layout, and all of it freezes flat when
+   the visitor has asked for reduced motion.
+
+   Kept outside @layer components on purpose — these are plain classes, not
+   Tailwind component utilities, and they are referenced from a single file. */
+
+.cf-scene {
+  z-index: 0;
+}
+
+/* ---- robot ---- */
+
+.cf-grid {
+  background-image:
+    linear-gradient(rgba(34, 211, 238, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(34, 211, 238, 0.07) 1px, transparent 1px);
+  background-size: 34px 34px;
+  animation: cf-grid-drift 14s linear infinite;
+  mask-image: radial-gradient(120% 90% at 50% 0%, #000 20%, transparent 75%);
+  -webkit-mask-image: radial-gradient(120% 90% at 50% 0%, #000 20%, transparent 75%);
+}
+@keyframes cf-grid-drift {
+  to {
+    background-position: 34px 34px;
+  }
+}
+
+.cf-scene svg [class^='cf-bot'] {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.cf-bot-bob {
+  animation: cf-bob 4.5s ease-in-out infinite;
+}
+@keyframes cf-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-7px);
+  }
+}
+
+/* Long open stretches, then a quick double blink — a steady blink reads robotic
+   in the wrong way. */
+.cf-bot-eye {
+  animation: cf-blink 6s ease-in-out infinite;
+}
+@keyframes cf-blink {
+  0%,
+  90%,
+  100% {
+    transform: scaleY(1);
+  }
+  92%,
+  96% {
+    transform: scaleY(0.12);
+  }
+  94% {
+    transform: scaleY(1);
+  }
+}
+
+.cf-bot-bulb {
+  animation: cf-bulb 2.6s ease-in-out infinite;
+}
+.cf-bot-lamp {
+  animation: cf-lamp 2.6s ease-in-out infinite;
+}
+@keyframes cf-bulb {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@keyframes cf-lamp {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: scale(0.85);
+  }
+  50% {
+    opacity: 0.75;
+    transform: scale(1.15);
+  }
+}
+
+.cf-bot-core {
+  animation: cf-bulb 2.6s ease-in-out infinite 0.4s;
+}
+.cf-bot-mouth {
+  opacity: 0;
+}
+.cf-bot-arm-l {
+  animation: cf-wave-l 4.5s ease-in-out infinite;
+}
+.cf-bot-arm-r {
+  animation: cf-wave-r 4.5s ease-in-out infinite;
+}
+@keyframes cf-wave-l {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(7deg);
+  }
+}
+@keyframes cf-wave-r {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(-7deg);
+  }
+}
+
+/* While the answer streams: eyes sweep, antenna races, and it starts talking. */
+.cf-busy .cf-bot-eyes {
+  animation: cf-scan 1.6s ease-in-out infinite;
+}
+.cf-busy .cf-bot-bulb,
+.cf-busy .cf-bot-lamp,
+.cf-busy .cf-bot-core {
+  animation-duration: 0.9s;
+}
+.cf-busy .cf-bot-bob {
+  animation-duration: 2.4s;
+}
+.cf-busy .cf-bot-mouth {
+  animation: cf-talk 0.5s steps(2, end) infinite;
+}
+@keyframes cf-scan {
+  0%,
+  100% {
+    transform: translateX(-4px);
+  }
+  50% {
+    transform: translateX(4px);
+  }
+}
+@keyframes cf-talk {
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: scaleX(0.5);
+  }
+  50% {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+}
+
+/* ---- nebula ---- */
+
+.cf-star {
+  animation: cf-twinkle 4s ease-in-out infinite;
+  box-shadow: 0 0 6px 1px rgba(199, 210, 254, 0.7);
+}
+@keyframes cf-twinkle {
+  0%,
+  100% {
+    opacity: 0.2;
+    transform: scale(0.7);
+  }
+  50% {
+    opacity: 0.95;
+    transform: scale(1);
+  }
+}
+
+.cf-drift {
+  background-image:
+    radial-gradient(38% 28% at 22% 30%, rgba(129, 140, 248, 0.3) 0%, transparent 70%),
+    radial-gradient(32% 26% at 76% 62%, rgba(217, 70, 239, 0.22) 0%, transparent 70%);
+  animation: cf-drift 22s ease-in-out infinite alternate;
+}
+@keyframes cf-drift {
+  0% {
+    transform: translate3d(-4%, 2%, 0) scale(1);
+  }
+  100% {
+    transform: translate3d(4%, -3%, 0) scale(1.15);
+  }
+}
+
+.cf-comet {
+  height: 2px;
+  width: 32%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, rgba(224, 231, 255, 0.9));
+  rotate: 16deg;
+  animation: cf-comet 11s ease-in infinite;
+  opacity: 0;
+  left: -35%;
+  top: 6%;
+}
+@keyframes cf-comet {
+  0% {
+    opacity: 0;
+    left: -35%;
+    top: 6%;
+  }
+  4% {
+    opacity: 0.9;
+  }
+  22% {
+    opacity: 0;
+    left: 105%;
+    top: 62%;
+  }
+  100% {
+    opacity: 0;
+    left: 105%;
+    top: 62%;
+  }
+}
+
+/* ---- circuit ---- */
+
+.cf-trace {
+  stroke-dasharray: 26 320;
+  stroke-dashoffset: 346;
+  filter: drop-shadow(0 0 3px rgba(52, 211, 153, 0.8));
+  animation: cf-trace 5.5s linear infinite;
+}
+@keyframes cf-trace {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.cf-busy .cf-trace {
+  animation-duration: 2.2s;
+}
+
+/* ---- lagoon ---- */
+
+.cf-bubble {
+  top: 104%;
+  /* Near-white on a near-white lagoon disappears, so the fill leans teal and
+     carries a rim rather than relying on the highlight alone. */
+  background: radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.9), rgba(13, 148, 136, 0.4));
+  border: 1px solid rgba(13, 148, 136, 0.35);
+  box-shadow: inset 0 0 4px rgba(255, 255, 255, 0.9);
+  animation-name: cf-rise;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  opacity: 0;
+}
+@keyframes cf-rise {
+  0% {
+    opacity: 0;
+    top: 104%;
+    transform: translateX(0) scale(0.7);
+  }
+  10% {
+    opacity: 0.9;
+  }
+  80% {
+    opacity: 0.65;
+  }
+  100% {
+    opacity: 0;
+    top: -12%;
+    transform: translateX(14px) scale(1.1);
+  }
+}
+
+/* The picker swatch is 38px square: the same scenes, dialled down so they read
+   as a hint of the theme rather than a competing animation. */
+.cf-mini .cf-grid {
+  background-size: 12px 12px;
+}
+.cf-mini .cf-star {
+  box-shadow: none;
+}
+.cf-mini .cf-bubble {
+  /* The swatch is 38px square: full-size bubbles would fill it. */
+  width: 5px !important;
+  height: 5px !important;
+  animation-duration: 4.5s !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cf-scene *,
+  .cf-scene {
+    animation: none !important;
+  }
+  /* The comet and the bubbles only exist as motion — hide them outright rather
+     than leaving a stray dash parked mid-screen. */
+  .cf-comet,
+  .cf-bubble {
+    display: none;
+  }
+  .cf-trace {
+    stroke-dashoffset: 0;
+    stroke-dasharray: none;
+    opacity: 0.35;
+  }
+}

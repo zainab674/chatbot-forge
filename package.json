@@ -1,0 +1,38 @@
+{
+  "name": "chatbot-forge",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Build a chatbot in minutes — pick a model, write its prompt, choose a talking style, then share it as a link, an iframe, or a floating widget.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx scripts/test.ts",
+    "test:e2e": "CF_FAKE_DB=1 next build && CF_FAKE_DB=1 node scripts/smoke.mjs",
+    "test:all": "npm run typecheck && npm test && npm run test:knowledge && npm run test:e2e && npm run test:nav && npm run test:visual",
+    "test:visual": "CF_FAKE_DB=1 next build && CF_FAKE_DB=1 node scripts/visual-check.mjs",
+    "test:nav": "CF_FAKE_DB=1 next build && CF_FAKE_DB=1 node scripts/nav-check.mjs",
+    "test:knowledge": "tsx scripts/test-knowledge.ts"
+  },
+  "dependencies": {
+    "mammoth": "^1.12.1",
+    "mongodb": "^6.10.0",
+    "next": "14.2.15",
+    "pdf-parse": "^2.4.5",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "autoprefixer": "^10.4.19",
+    "playwright": "^1.62.1",
+    "postcss": "^8.4.38",
+    "tailwindcss": "^3.4.6",
+    "tsx": "^4.23.12",
+    "typescript": "^5.5.4"
+  }
+}
