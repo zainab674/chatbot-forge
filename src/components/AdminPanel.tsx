@@ -87,6 +87,8 @@ export default function AdminPanel() {
         <Stat label="Credits outstanding" value={data.stats.creditsOutstanding} />
       </div>
 
+      <KeyRequests />
+
       <PlatformKeys />
 
       <GrantCredits onDone={load} />
@@ -491,5 +493,187 @@ function GrantCredits({ onDone }: { onDone: () => void }) {
       )}
       {note && <p className="mt-3 text-xs text-emerald-700">{note}</p>}
     </section>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Key requests                                                         */
+/* ------------------------------------------------------------------ */
+
+type RequestStatus = 'pending' | 'approved' | 'declined';
+
+interface KeyRequestRow {
+  id: string;
+  email: string;
+  provider: string;
+  providerLabel: string;
+  model: string;
+  reason: string;
+  status: RequestStatus;
+  createdAt: string;
+  decidedBy: string | null;
+  decidedAt: string | null;
+  adminNote: string;
+}
+
+/**
+ * Who has asked for a key, and what you said.
+ *
+ * Deciding one is bookkeeping: approving records that you agreed, and it moves
+ * neither a key nor a credit. The two sections below this one are where the
+ * grant actually happens — set the provider's platform key, or top the account
+ * up — and then you come back here and mark the request answered. A button in a
+ * list that quietly handed out spend would be far too easy to press.
+ */
+function KeyRequests() {
+  const [rows, setRows] = useState<KeyRequestRow[] | null>(null);
+  const [pending, setPending] = useState(0);
+  const [showAll, setShowAll] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(() => {
+    fetch('/api/admin/key-requests')
+      .then(async (r) => {
+        const j = await r.json();
+        if (!r.ok) throw new Error(j?.error ?? 'Could not load the key requests.');
+        return j;
+      })
+      .then((j) => {
+        setRows(j.requests);
+        setPending(j.pending);
+      })
+      .catch((e) => setError(e.message));
+  }, []);
+
+  useEffect(load, [load]);
+
+  const visible = rows?.filter((r) => showAll || r.status === 'pending') ?? [];
+
+  return (
+    <section className="card">
+      <div className="flex flex-wrap items-baseline justify-between gap-3">
+        <h2 className="text-base font-semibold">
+          Key requests
+          {pending > 0 && (
+            <span className="ml-2 border border-amber-300 bg-amber-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-800">
+              {pending} waiting
+            </span>
+          )}
+        </h2>
+        {rows && rows.length > 0 && (
+          <button
+            className="text-[11px] text-slate-600 underline underline-offset-2 hover:text-slate-900"
+            onClick={() => setShowAll((v) => !v)}
+          >
+            {showAll ? 'Show only what is waiting' : `Show all ${rows.length}`}
+          </button>
+        )}
+      </div>
+      <p className="hint">
+        Creators with no key of their own asking you to cover them. Approving records your decision — it does not hand
+        out anything. Set the key under &ldquo;Platform keys&rdquo; or top the account up under &ldquo;Grant
+        credits&rdquo;, then mark the request here.
+      </p>
+
+      {error && <p className="mt-3 text-sm text-red-700">{error}</p>}
+      {!rows && !error && <div className="mt-4 h-24 animate-pulse rounded-control bg-slate-100" />}
+      {rows && rows.length === 0 && <p className="mt-3 text-sm text-slate-600">Nobody has asked for a key yet.</p>}
+      {rows && rows.length > 0 && visible.length === 0 && (
+        <p className="mt-3 text-sm text-slate-600">Nothing waiting — every request has been answered.</p>
+      )}
+
+      {visible.length > 0 && (
+        <div className="mt-4 space-y-2.5">
+          {visible.map((row) => (
+            <KeyRequestCard key={row.id} row={row} onDone={load} />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function KeyRequestCard({ row, onDone }: { row: KeyRequestRow; onDone: () => void }) {
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState<RequestStatus | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function decide(status: 'approved' | 'declined') {
+    setBusy(status);
+    setError(null);
+    try {
+      const res = await fetch('/api/admin/key-requests', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: row.id, status, note }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error ?? 'Could not record the decision.');
+      onDone();
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const badge =
+    row.status === 'pending'
+      ? 'border-amber-300 bg-amber-50 text-amber-800'
+      : row.status === 'approved'
+        ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+        : 'border-slate-300 bg-slate-50 text-slate-700';
+
+  return (
+    <div className="rounded-control border border-slate-300 px-4 py-3">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <span className="text-sm font-medium">{row.email}</span>
+        <span className="text-xs text-slate-600">
+          {row.providerLabel}
+          {row.model && ` · ${row.model}`}
+        </span>
+        <span className={`border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${badge}`}>
+          {row.status}
+        </span>
+        <span className="ml-auto text-[11px] text-slate-600">{new Date(row.createdAt).toLocaleDateString()}</span>
+      </div>
+
+      {/* Whatever the requester typed, shown as typed. Rendered as text, never
+          as markup — this is a stranger's string on an admin's screen. */}
+      <p className="mt-2 whitespace-pre-wrap border-l-2 border-slate-200 pl-3 text-[13px] leading-relaxed text-slate-700">
+        {row.reason}
+      </p>
+
+      {row.status === 'pending' ? (
+        <div className="mt-2.5 flex flex-wrap gap-2">
+          <input
+            className="field !w-auto min-w-[220px] flex-1 !py-2 !text-xs"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Reply they will see in the builder (optional)"
+          />
+          <button
+            className="btn-primary shrink-0 !px-5 !py-2"
+            onClick={() => decide('approved')}
+            disabled={busy !== null}
+            title="Records that you agreed. Grant the credits or set the platform key separately."
+          >
+            {busy === 'approved' ? '…' : 'Approve'}
+          </button>
+          <button className="btn-ghost shrink-0 !px-5 !py-2" onClick={() => decide('declined')} disabled={busy !== null}>
+            {busy === 'declined' ? '…' : 'Decline'}
+          </button>
+        </div>
+      ) : (
+        <p className="mt-2 text-[11px] text-slate-600">
+          {row.status === 'approved' ? 'Approved' : 'Declined'}
+          {row.decidedBy && ` by ${row.decidedBy}`}
+          {row.decidedAt && ` on ${new Date(row.decidedAt).toLocaleDateString()}`}
+          {row.adminNote && ` — “${row.adminNote}”`}
+        </p>
+      )}
+
+      {error && <p className="mt-2 text-[11px] text-red-700">{error}</p>}
+    </div>
   );
 }

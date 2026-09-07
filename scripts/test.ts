@@ -12,7 +12,7 @@ import { createHmac } from 'node:crypto';
 import { encrypt, decrypt, maskKey, newId } from '../src/lib/crypto';
 import { buildSystemPrompt, DEFAULT_CONFIG } from '../src/lib/prompt';
 import { parseConfig, originAllowed, effectiveOrigin } from '../src/lib/validate';
-import { PROVIDERS, getProvider, resolveKey, resolveBaseUrl } from '../src/lib/providers';
+import { PROVIDERS, getProvider, resolveBaseUrl } from '../src/lib/providers';
 import { isPrivateIp, assertPublicUrl, assertReachableEndpoint } from '../src/lib/net-guard';
 import { TALKING_STYLES } from '../src/lib/styles';
 import { streamChat, UpstreamError } from '../src/lib/llm';
@@ -44,8 +44,15 @@ import {
   PLATFORM_MAX_SYSTEM_CHARS,
   TOKENS_PER_CREDIT,
 } from '../src/lib/credits';
+import { SIGNUP_CREDITS } from '../src/lib/platform';
 import { users as usersCollection } from '../src/lib/mongodb';
 import { setPlatformKey } from '../src/lib/platform-keys';
+import {
+  createKeyRequest,
+  decideKeyRequest,
+  listAllKeyRequests,
+  listKeyRequestsFor,
+} from '../src/lib/key-requests';
 import { verifyWebhookSignature, stripeConfigured } from '../src/lib/stripe';
 import { PACKS, getPack, formatPrice } from '../src/lib/packs';
 import { appUrl, mailConfigured } from '../src/lib/mail';
@@ -220,8 +227,9 @@ check('the root admin passes even if stored as a plain user', withAdminEmail('ro
 check('an unknown role string is not admin', withAdminEmail(undefined, () => !isAdmin({ email: 'x@example.com', role: 'superuser' })));
 check('no user is not admin', withAdminEmail('root@example.com', () => !isAdmin(null) && !isAdmin(undefined)));
 
-check('platform tier includes only cheap models', PLATFORM_MODELS.has('gpt-4o-mini') && !PLATFORM_MODELS.has('gpt-4o') && !PLATFORM_MODELS.has('claude-opus-4-1'));
+check('platform tier includes only cheap models', PLATFORM_MODELS.has('gpt-4o-mini') && !PLATFORM_MODELS.has('gpt-4o') && !PLATFORM_MODELS.has('gemini-2.5-pro'));
 check('every platform model belongs to a known provider', [...PLATFORM_MODELS].every((m) => PROVIDERS.some((p) => p.models.some((x) => x.id === m))));
+check('a new account starts with credits it can actually spend', SIGNUP_CREDITS >= creditsFor(PLATFORM_MAX_PROMPT_CHARS, PLATFORM_MAX_OUTPUT_TOKENS));
 
 /* ------------------------------------------------------------------ */
 group('Colour contrast');
@@ -480,23 +488,10 @@ group('Provider catalog');
 check('every provider has a unique id', new Set(PROVIDERS.map((p) => p.id)).size === PROVIDERS.length);
 check('every provider has a base URL or lets you set one', PROVIDERS.every((p) => p.baseUrl || p.editableBaseUrl));
 check('every listed model has an id', PROVIDERS.every((p) => p.models.every((m) => m.id && m.label)));
-check('OpenAI, Anthropic, Gemini and Groq are all present', ['openai', 'anthropic', 'google', 'groq'].every((id) => getProvider(id)));
-check('only Anthropic needs the non-OpenAI adapter', PROVIDERS.filter((p) => p.api === 'anthropic').map((p) => p.id).join() === 'anthropic');
+check('OpenAI, Gemini and Groq are all present', ['openai', 'google', 'groq'].every((id) => getProvider(id)));
+check('every provider speaks the OpenAI wire format', PROVIDERS.every((p) => p.api === 'openai'));
 
 const openai = getProvider('openai')!;
-check("the creator's own key wins", resolveKey(openai, 'creator-key', 'platform-key') === 'creator-key');
-check('the platform key is the fallback', resolveKey(openai, null, 'platform-key') === 'platform-key');
-check('no key at all resolves to null', resolveKey(getProvider('groq')!, null, null) === null);
-check('an omitted platform key is the same as none', resolveKey(openai, null) === null);
-check('an empty creator key falls through to the platform key', resolveKey(openai, '', 'platform-key') === 'platform-key');
-// The env vars are gone: a provider key set in the environment must NOT be
-// picked up any more, or a stale deploy variable would silently keep paying.
-check('environment variables are no longer consulted', (() => {
-  process.env.OPENAI_API_KEY = 'stale-env-key';
-  const r = resolveKey(openai, null);
-  delete process.env.OPENAI_API_KEY;
-  return r === null;
-})());
 check('no provider declares an envKey any more', PROVIDERS.every((p) => !('envKey' in p)));
 
 /* ------------------------------------------------------------------ */
@@ -596,23 +591,39 @@ const server = http.createServer((req, res) => {
       return;
     }
 
-    res.writeHead(200, { 'Content-Type': 'text/event-stream' });
-    if (req.url?.includes('/messages')) {
-      // Anthropic shape
-      res.write('event: message_start\ndata: {"type":"message_start"}\n\n');
-      for (const t of ['Hello', ', ', 'world']) {
-        res.write(`data: ${JSON.stringify({ type: 'content_block_delta', delta: { type: 'text_delta', text: t } })}\n\n`);
-      }
-      res.write('data: {"type":"message_stop"}\n\n');
-    } else {
-      // OpenAI shape — deliberately includes a keep-alive and a junk frame
-      res.write(': keep-alive\n\n');
-      for (const t of ['Hello', ', ', 'world']) {
-        res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: t } }] })}\n\n`);
-      }
-      res.write('data: {not valid json\n\n');
-      res.write('data: [DONE]\n\n');
+    // A reasoning model's opening: frames that carry no visible text, each
+    // flushed on its own so they arrive as separate chunks. Groq's gpt-oss
+    // streams its whole thinking phase this way before the answer starts.
+    if (req.url?.includes('/thinking')) {
+      res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+      const frames = [
+        { choices: [{ delta: { role: 'assistant', content: '' } }] },
+        { choices: [{ delta: { reasoning: 'The user said hi' } }] },
+        { choices: [{ delta: { reasoning: '; answer briefly' } }] },
+        { choices: [{ delta: { content: 'Answer' } }] },
+      ];
+      let i = 0;
+      const nextFrame = () => {
+        if (i === frames.length) {
+          res.write('data: [DONE]\n\n');
+          res.end();
+          return;
+        }
+        res.write(`data: ${JSON.stringify(frames[i++])}\n\n`);
+        setTimeout(nextFrame, 15);
+      };
+      nextFrame();
+      return;
     }
+
+    res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+    // OpenAI shape — deliberately includes a keep-alive and a junk frame
+    res.write(': keep-alive\n\n');
+    for (const t of ['Hello', ', ', 'world']) {
+      res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: t } }] })}\n\n`);
+    }
+    res.write('data: {not valid json\n\n');
+    res.write('data: [DONE]\n\n');
     res.end();
   });
 });
@@ -935,6 +946,84 @@ function billingTests() {
   check('buying is off until Stripe is configured', stripeConfigured() === Boolean(process.env.STRIPE_SECRET_KEY));
 }
 
+/* ------------------------------------------------------------------ */
+/**
+ * Asking the admin for a key.
+ *
+ * The rules worth holding: one pending request per provider (so nudging does
+ * not become a second row on the admin's list), a cap on how many an account
+ * may have open at once, and a decision that records agreement without moving
+ * a key or a credit.
+ */
+async function keyRequestTests() {
+  group('Key requests');
+  process.env.CF_FAKE_DB = '1';
+
+  const asker = { id: 'req-user-1', email: 'asker@example.com' };
+
+  const first = await createKeyRequest(asker, { provider: 'openai', model: 'gpt-4o-mini', reason: 'support bot' });
+  check('a request is filed', 'request' in first && first.request.status === 'pending');
+  check('the provider label is resolved for the panel', 'request' in first && first.request.providerLabel === 'OpenAI');
+  check('the requester is named on it', 'request' in first && first.request.email === asker.email);
+
+  const blank = await createKeyRequest(asker, { provider: 'openai', reason: '   ' });
+  check('an empty note is refused', 'error' in blank && blank.status === 400);
+
+  const unknown = await createKeyRequest(asker, { provider: 'not-a-provider', reason: 'please' });
+  check('an unknown provider is refused', 'error' in unknown && unknown.status === 400);
+
+  const again = await createKeyRequest(asker, { provider: 'openai', reason: 'still waiting' });
+  check('a second pending request for the same provider is refused', 'error' in again && again.status === 409);
+
+  const other = await createKeyRequest(asker, { provider: 'groq', reason: 'different provider' });
+  check('a different provider is still allowed', 'request' in other);
+
+  // The per-provider rule is the only cap, so it has to actually bound the
+  // list: one open row per provider and no way to add a second.
+  for (const p of PROVIDERS) await createKeyRequest(asker, { provider: p.id, reason: `ask about ${p.id}` });
+  const capped = await Promise.all(
+    PROVIDERS.map((p) => createKeyRequest(asker, { provider: p.id, reason: 'again' })),
+  );
+  check('one open request per provider is the ceiling', capped.every((r) => 'error' in r && r.status === 409));
+  check(
+    'and that is every provider there is',
+    (await listKeyRequestsFor(asker.id)).filter((r) => r.status === 'pending').length === PROVIDERS.length,
+  );
+
+  const stranger = { id: 'req-user-2', email: 'somebody-else@example.com' };
+  await createKeyRequest(stranger, { provider: 'openai', reason: 'not the asker' });
+
+  const id = 'request' in first ? first.request.id : '';
+  const badStatus = await decideKeyRequest(id, 'pending' as any, 'admin@example.com');
+  check('"pending" is not a decision', 'error' in badStatus && badStatus.status === 400);
+  const missing = await decideKeyRequest('no-such-id', 'approved', 'admin@example.com');
+  check('deciding a request that is gone is a 404', 'error' in missing && missing.status === 404);
+
+  const decided = await decideKeyRequest(id, 'approved', 'admin@example.com', 'granted 500 credits');
+  check('a decision sticks', 'request' in decided && decided.request.status === 'approved');
+  check('the deciding admin is recorded', 'request' in decided && decided.request.decidedBy === 'admin@example.com');
+  check('the reply is kept for the requester', 'request' in decided && decided.request.adminNote === 'granted 500 credits');
+
+  // Approving frees the provider up again — the block is on *pending* ones, so
+  // a creator whose approval never materialised can ask a second time.
+  const reask = await createKeyRequest(asker, { provider: 'openai', reason: 'nothing arrived' });
+  check('a decided request does not block the next one', 'request' in reask);
+
+  const mine = await listKeyRequestsFor(asker.id);
+  check('an account sees its own requests', mine.length === PROVIDERS.length + 1);
+  check('no other account leaks into that list', mine.every((r) => r.email === asker.email));
+  check('newest first', mine[0].createdAt >= mine[mine.length - 1].createdAt);
+
+  const all = await listAllKeyRequests();
+  check('the admin sees every request', all.requests.length === PROVIDERS.length + 2);
+  check(
+    'the waiting count matches what is actually pending',
+    all.pending === all.requests.filter((r) => r.status === 'pending').length,
+  );
+
+  delete process.env.CF_FAKE_DB;
+}
+
 async function run() {
   group('Endpoint SSRF guard (deferred)');
   await runDeferred();
@@ -942,6 +1031,7 @@ async function run() {
   await rateLimitTests();
   await creditTests();
   await recoveryTests();
+  await keyRequestTests();
 
   await new Promise<void>((r) => server.listen(PORT, '127.0.0.1', r));
 
@@ -966,25 +1056,30 @@ async function run() {
   check('forwards model, temperature and max tokens', lastRequest.model === 'fake-1' && lastRequest.temperature === 0.5 && lastRequest.max_tokens === 256);
   check('requests a stream', lastRequest.stream === true);
 
-  group('Anthropic adapter');
-  const anthropic = getProvider('anthropic')!;
-  const anthropicText = await readAll(
-    await streamChat({
-      provider: anthropic,
-      baseUrl: `http://127.0.0.1:${PORT}/v1`,
-      apiKey: 'sk-ant-test',
-      model: 'claude-test',
-      system: 'SYSTEM PROMPT HERE',
-      messages: [{ role: 'user', content: 'hi there' }],
-      temperature: 0.5,
-      maxTokens: 256,
-    }),
+  group('Reasoning-model frames');
+  // The regression: a `pull` that consumed a chunk without enqueuing anything
+  // was never called again, so a bot on a reasoning model streamed nothing at
+  // all — the request simply hung until the browser gave up.
+  const thinkingText = await Promise.race([
+    readAll(
+      await streamChat({
+        provider: { ...openai, baseUrl: `http://127.0.0.1:${PORT}/thinking` },
+        baseUrl: `http://127.0.0.1:${PORT}/thinking`,
+        apiKey: 'test-key',
+        model: 'fake-1',
+        system: 's',
+        messages: [{ role: 'user', content: 'hi' }],
+        temperature: 0.5,
+        maxTokens: 64,
+      }),
+    ),
+    new Promise<string>((r) => setTimeout(() => r('<stalled>'), 5_000)),
+  ]);
+  check(
+    'text-free frames do not stall the stream',
+    thinkingText === 'Answer',
+    `(got ${JSON.stringify(thinkingText)})`,
   );
-  check('streams text_delta events', anthropicText === 'Hello, world');
-  check('uses the x-api-key header', lastHeaders['x-api-key'] === 'sk-ant-test');
-  check('sends the anthropic-version header', lastHeaders['anthropic-version'] === '2023-06-01');
-  check('sends the system prompt as a top-level field', lastRequest.system === 'SYSTEM PROMPT HERE');
-  check('does not put a system role in messages', !lastRequest.messages.some((m: any) => m.role === 'system'));
 
   group('Upstream error handling');
   let caught: any = null;

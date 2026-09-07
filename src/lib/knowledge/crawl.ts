@@ -10,7 +10,7 @@
  * and checks the actual IP, follows redirects manually so each hop is
  * re-validated, and caps the response body while it streams.
  */
-import { assertReachableUrl } from '../net-guard';
+import { pinnedFetch } from '../net-guard';
 import { htmlToText, extractTitle, extractLinks, extractSitemapUrls } from './html';
 
 export interface Page {
@@ -52,11 +52,12 @@ interface FetchResult {
 /**
  * The only fetch in this file.
  *
- * Redirects are followed by hand (`redirect: 'manual'`) because the allow-list
- * is worthless otherwise: a public URL that 302s to 127.0.0.1 would otherwise
- * pull an internal page into someone's chatbot. Each hop is re-validated, and
- * DNS is resolved so that a public hostname pointing at a private address
- * (the classic `127.0.0.1.nip.io` trick) is rejected too.
+ * Redirects are followed by hand because the allow-list is worthless otherwise:
+ * a public URL that 302s to 127.0.0.1 would pull an internal page into
+ * someone's chatbot. Each hop is re-validated, DNS is resolved so a public
+ * hostname pointing at a private address (the classic `127.0.0.1.nip.io` trick)
+ * is rejected too — and `pinnedFetch` then connects to the very address that
+ * was checked, so the name cannot resolve to something else in between.
  */
 export async function safeFetch(
   rawUrl: string,
@@ -66,21 +67,19 @@ export async function safeFetch(
 
   let current = rawUrl;
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-    await assertReachableUrl(current);
-
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     const onAbort = () => controller.abort();
     signal?.addEventListener('abort', onAbort);
 
     try {
-      const res = await fetch(current, {
+      // Validates and connects in one step, so nothing can change underneath.
+      const res = await pinnedFetch(current, {
         headers: {
           'User-Agent': UA,
           Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,text/plain;q=0.8,*/*;q=0.5',
         },
         signal: controller.signal,
-        redirect: 'manual',
       });
 
       if (res.status >= 300 && res.status < 400) {
@@ -251,4 +250,4 @@ function normalise(u: string): string {
 
 // Lives in lib/net-guard.ts now: the chat path needs the same checks for a
 // bot's custom endpoint, and one copy of these rules is the only safe number.
-export { isPrivateIp, assertPublicUrl, assertReachableUrl } from '../net-guard';
+export { isPrivateIp, assertPublicUrl, assertReachableUrl, pinnedFetch } from '../net-guard';

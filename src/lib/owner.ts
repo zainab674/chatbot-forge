@@ -5,13 +5,15 @@
  * localStorage that scopes the dashboard to this browser. Replace `getOwnerId`
  * with your session user id when you bolt on real auth — nothing else changes.
  */
+import { randomId } from './random-id';
+
 const KEY = 'chatbot-forge:owner';
 
 export function getOwnerId(): string {
   if (typeof window === 'undefined') return '';
   let id = localStorage.getItem(KEY);
   if (!id) {
-    id = crypto.randomUUID().replace(/-/g, '');
+    id = randomId();
     localStorage.setItem(KEY, id);
   }
   return id;

@@ -14,7 +14,19 @@ const FOOTER_LINKS = [
   { href: '/terms', label: 'Terms' },
 ];
 
-export default function Shell({ children, wide = false }: { children: React.ReactNode; wide?: boolean }) {
+export default function Shell({
+  children,
+  wide = false,
+  bleed,
+}: {
+  children: React.ReactNode;
+  wide?: boolean;
+  /** Rendered directly under the masthead, outside the gutter and the measure,
+   *  so it spans the viewport. For a hero that is a painted surface rather than
+   *  a card: inside <main> the shell's own padding frames it in cream, which
+   *  reads as a gap rather than as a margin. */
+  bleed?: React.ReactNode;
+}) {
   const measure = wide ? 'max-w-[1240px]' : 'max-w-5xl';
   return (
     <div className="min-h-screen">
@@ -31,12 +43,16 @@ export default function Shell({ children, wide = false }: { children: React.Reac
           beneath it live there now. */}
       <SiteNav wide={wide} />
 
-      <main id="main" className={`mx-auto px-6 py-12 ${measure}`}>
-        {children}
+      {/* <main> spans the page so a bleed child can; the measure moved inside
+          it. The skip link still lands here, above the bleed, which is what
+          keeps a hero's own call to action reachable from the keyboard. */}
+      <main id="main">
+        {bleed}
+        <div className={`mx-auto px-6 pb-12 ${bleed ? 'pt-0' : 'pt-12'} ${measure}`}>{children}</div>
       </main>
 
-      {/* Same measure as <main>, or the closing rule runs wider than the
-          content it is closing. */}
+      {/* Same measure as the page body above, or the closing rule runs wider
+          than the content it is closing. */}
       <footer className={`mx-auto px-6 pb-16 pt-8 ${measure}`}>
         <span className="mb-8 block h-px w-full bg-slate-200" aria-hidden />
         <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-end sm:justify-between">

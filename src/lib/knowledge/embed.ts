@@ -2,13 +2,13 @@
  * Embeddings.
  *
  * Same trick as the chat adapters: nearly every vendor implements OpenAI's
- * `POST /embeddings`, so one adapter covers the lot. Anthropic has no embedding
- * endpoint, which is why Voyage is in the list — it is what they recommend.
+ * `POST /embeddings`, so one adapter covers the lot. Voyage and Cohere are on
+ * the list because some chat vendors have no embedding endpoint of their own.
  *
  * A bot can also run with `embeddingProvider: 'none'`, in which case retrieval
  * falls back to keyword scoring. That keeps the knowledge base usable for
  * someone whose only key is for a provider with no embedding API (Groq,
- * OpenRouter, Anthropic) without forcing them to sign up for another service.
+ * OpenRouter) without forcing them to sign up for another service.
  */
 
 export interface EmbeddingProvider {
@@ -48,7 +48,7 @@ export const EMBEDDING_PROVIDERS: EmbeddingProvider[] = [
   },
   {
     id: 'voyage',
-    label: 'Voyage AI (recommended with Claude)',
+    label: 'Voyage AI',
     baseUrl: 'https://api.voyageai.com/v1',
     keyUrl: 'https://dash.voyageai.com',
     envKey: 'VOYAGE_API_KEY',

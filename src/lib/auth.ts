@@ -95,7 +95,15 @@ export function verifySession(token: string | undefined | null, now = Date.now()
   return { userId, issuedAt: Number.isFinite(issuedAt) ? issuedAt : 0 };
 }
 
-/** Returns the user id, or null. Does not consider revocation — see `sessionOwner`. */
+/**
+ * Returns the user id, or null. Signature and expiry only.
+ *
+ * Deliberately not enough on its own for anything that reads or spends account
+ * data: it cannot see a revoked session or a deleted account, because both live
+ * in the database. Pair it with `sessionRevoked` — or use `resolveOwner` — on
+ * any route that acts for the user. The server-rendered pages below use it to
+ * decide what to render, and the routes they call check properly.
+ */
 export function verifySessionToken(token: string | undefined | null, now = Date.now()): string | null {
   return verifySession(token, now)?.userId ?? null;
 }
@@ -128,10 +136,6 @@ export const sessionCookieOptions = {
 /* Request helpers                                                      */
 /* ------------------------------------------------------------------ */
 
-export function sessionUserId(req: NextRequest): string | null {
-  return verifySessionToken(req.cookies.get(SESSION_COOKIE)?.value);
-}
-
 /** The signed session on this request, before any revocation check. */
 export function sessionOf(req: NextRequest): Session | null {
   return verifySession(req.cookies.get(SESSION_COOKIE)?.value);
@@ -144,6 +148,21 @@ export function sessionOf(req: NextRequest): Session | null {
  * user id — so header identity reaches anonymous drafts and nothing else.
  */
 export const ANON_PREFIX = 'anon:';
+
+/**
+ * The shape of an anonymous browser id.
+ *
+ * Long random ids only: too short to be guessable is too short to accept, and a
+ * real user id (12 chars, see `newId`) can never match even before the prefix.
+ * Both the header path and the claim path below check against this one pattern,
+ * because the moment the two disagree about what an anonymous id looks like,
+ * the looser of them becomes the way in.
+ */
+const ANON_ID = /^[A-Za-z0-9_-]{16,64}$/;
+
+export function isAnonId(value: unknown): value is string {
+  return typeof value === 'string' && ANON_ID.test(value);
+}
 
 export function isAnonOwner(ownerId: string | null | undefined): boolean {
   return typeof ownerId === 'string' && ownerId.startsWith(ANON_PREFIX);
@@ -171,15 +190,23 @@ export async function resolveOwner(req: NextRequest): Promise<string | null> {
     if (user) return null;
   }
   const anon = req.headers.get('x-owner-id')?.trim() ?? '';
-  // Long random ids only: too short to be guessable is too short to accept,
-  // and a real user id (12 chars) can never match even before the prefix.
-  if (/^[A-Za-z0-9_-]{16,64}$/.test(anon)) return ANON_PREFIX + anon;
+  if (isAnonId(anon)) return ANON_PREFIX + anon;
   return null;
 }
 
-/** Matches a browser's drafts whether stored with the prefix or from the
- * pre-accounts era without it — used by signup/login to claim them. */
-export function anonClaimFilter(anonId: string) {
+/**
+ * Matches a browser's drafts whether stored with the prefix or from the
+ * pre-accounts era without it — used by signup/login to claim them.
+ *
+ * Returns null for anything not shaped like an anonymous browser id, and that
+ * check is a security boundary rather than tidiness. The bare arm of the `$in`
+ * matches how an *account's* bots are stored too, so a caller free to put an
+ * arbitrary string in here could name another account's user id at login and
+ * have every chatbot that account owns — stored API key included — moved onto
+ * its own. `ANON_ID` is what keeps a real user id (12 chars) out.
+ */
+export function anonClaimFilter(anonId: unknown): { ownerId: { $in: string[] } } | null {
+  if (!isAnonId(anonId)) return null;
   return { ownerId: { $in: [anonId, ANON_PREFIX + anonId] } };
 }
 

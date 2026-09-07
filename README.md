@@ -115,12 +115,12 @@ retrieval, so a short question still retrieves the right thing.
 
 ### Embedding providers
 
-OpenAI, Google Gemini, Voyage (what Anthropic recommends, since Claude has no embedding endpoint),
-Mistral, Cohere, Together, Ollama, or any OpenAI-compatible `/embeddings` URL.
+OpenAI, Google Gemini, Voyage, Mistral, Cohere, Together, Ollama, or any OpenAI-compatible
+`/embeddings` URL.
 
 When the embedding vendor matches the chat vendor, the same key covers both and the field can be
-left blank. When the creator's only key is for a provider with no embedding API (Groq, OpenRouter,
-Anthropic), the bot can run with embeddings set to **none** and retrieval falls back to keyword
+left blank. When the creator's only key is for a provider with no embedding API (Groq,
+OpenRouter), the bot can run with embeddings set to **none** and retrieval falls back to keyword
 search, which still works well on FAQs and product docs.
 
 ### Vector search on Atlas
@@ -206,13 +206,13 @@ many chunks were used, so the body stays a clean text stream.
 
 ## Supported chat providers
 
-Twelve out of the box, plus anything else that speaks the OpenAI wire format:
+Eleven out of the box, plus anything else that speaks the OpenAI wire format:
 
-OpenAI, Anthropic (Claude), Google Gemini, Groq, OpenRouter, Mistral, DeepSeek, xAI (Grok),
-Together AI, Fireworks, Perplexity, Ollama (self-hosted), and **Custom** for any base URL.
+OpenAI, Google Gemini, Groq, OpenRouter, Mistral, DeepSeek, xAI (Grok), Together AI, Fireworks,
+Perplexity, Ollama (self-hosted), and **Custom** for any base URL.
 
-Only two adapters exist in the codebase, OpenAI-compatible and Anthropic, because nearly every
-vendor now implements `POST /chat/completions`. **Adding a provider is one entry in
+One adapter covers all of them, because nearly every vendor now implements
+`POST /chat/completions`. **Adding a provider is one entry in
 `src/lib/providers.ts` and nothing else.** Every provider also lets you type a model id by hand, so
 you are never blocked waiting for the list to be updated.
 
@@ -222,9 +222,15 @@ Each creator pastes their own API key, which is encrypted with AES-256-GCM befor
 database and only ever decrypted server-side, at request time. Visitors chatting with a bot never
 see it, and neither does the dashboard, which only shows a `sk-a••••3210` mask.
 
-Optionally, set `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, `GROQ_API_KEY`,
-`OPENROUTER_API_KEY` or `VOYAGE_API_KEY` in the environment as a platform-wide fallback, used only
+Optionally, set `OPENAI_API_KEY`, `GOOGLE_API_KEY`, `GROQ_API_KEY`, `OPENROUTER_API_KEY` or
+`VOYAGE_API_KEY` in the environment as a platform-wide fallback, used only
 when a creator leaves the key field blank.
+
+A creator with neither a key nor credits is not stuck at that step. The model step offers **ask the
+admin for a key**: a short note that lands in `/admin` with their address, the provider and model
+they were on, and what they typed. One open request per provider, so nudging does not turn into a
+second row on the list. Deciding one is bookkeeping, not a grant — approving records that the admin
+agreed, and the key or the credits still arrive through *Platform keys* or *Grant credits*.
 
 ---
 
@@ -243,6 +249,8 @@ src/
     api/bots/[id]/public/          theme and copy for the chat UI, no secrets
     api/bots/[id]/sources/         knowledge base: add, list, delete
     api/chat/[id]/                 streaming proxy, the only place keys are used
+    api/key-requests/              creators asking the admin to cover them
+    api/admin/key-requests/        who asked, and answering them
   components/
     BotForm.tsx                    the builder with live preview
     ChatWindow.tsx                 the chat UI, shared by every surface
@@ -250,6 +258,8 @@ src/
     ManageBot.tsx                  share and embed panel
     Markdown.tsx                   tiny escape-first markdown renderer
     EmbedBridge.tsx                iframe to host page messaging
+    AdminPanel.tsx                 platform overview, keys, credits, key requests
+    KeyRequest.tsx                 "ask the admin for a key", inside the builder
   lib/
     providers.ts                   chat provider catalog     <- add providers here
     styles.ts                      talking-style presets     <- add voices here
@@ -259,6 +269,7 @@ src/
     contrast.ts                    WCAG-safe colours for any accent
     validate.ts                    input validation and domain allow-list
     mongodb.ts                     connection, collections, indexes
+    key-requests.ts                filing and deciding key requests
     knowledge/
       constants.ts                 shared file-type limits
       extract.ts                   PDF, DOCX, CSV, JSON, HTML to text

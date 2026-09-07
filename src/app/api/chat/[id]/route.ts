@@ -211,7 +211,11 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   try {
     const sourcesCol = await sourcesCollection();
-    hasSources = (await sourcesCol.countDocuments({ botId: doc.id, status: 'ready' })) > 0;
+    // Whether there is one, not how many. This runs on every single message, and
+    // counting every source to answer a yes/no question is work nobody reads.
+    hasSources = Boolean(
+      await sourcesCol.findOne({ botId: doc.id, status: 'ready' }, { projection: { _id: 0, id: 1 } }),
+    );
   } catch {
     hasSources = false;
   }
@@ -352,6 +356,9 @@ function tapStream(
       try {
         const { done, value } = await reader.read();
         if (done) {
+          // Flush the decoder: a final character split across two chunks is
+          // otherwise dropped from the transcript that gets stored.
+          collected += decoder.decode();
           controller.close();
           if (collected) onDone(collected);
           return;

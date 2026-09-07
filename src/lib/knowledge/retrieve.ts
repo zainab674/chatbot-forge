@@ -207,8 +207,14 @@ export async function retrieve(args: RetrieveArgs): Promise<Retrieved[]> {
   }
 
   // In-process path: load this bot's chunks and score them here.
+  //
+  // Embeddings come along only when there is a query vector to compare them
+  // against. A keyword-only bot — the default, since Groq serves no embedding
+  // endpoint — was otherwise pulling thousands of 1536-float arrays out of the
+  // database on every message purely to ignore every one of them.
+  const projection: Record<string, 0> = queryVector ? { _id: 0 } : { _id: 0, embedding: 0 };
   const docs = (await col
-    .find({ botId: bot.id }, { projection: { _id: 0 } })
+    .find({ botId: bot.id }, { projection })
     .limit(MAX_SCAN)
     .toArray()) as ChunkDoc[];
   if (!docs.length) return [];

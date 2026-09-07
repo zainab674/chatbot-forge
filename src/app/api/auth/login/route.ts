@@ -51,16 +51,19 @@ export async function POST(req: NextRequest) {
   try {
     const col = await users();
     const user = await col.findOne({ email });
-    // Same message for both failures, so the endpoint does not confirm which
-    // emails have accounts.
-    if (!user || !verifyPassword(password, user.passwordHash)) {
+    // Same message for all three failures, so the endpoint does not confirm
+    // which emails have accounts — including the deleted ones. A deletion marks
+    // the row before it erases anything (see /api/auth/account), and handing out
+    // a session in that window produces a login that every other route then
+    // refuses, because they all check `deletedAt` and this one used not to.
+    if (!user || user.deletedAt || !verifyPassword(password, user.passwordHash)) {
       return NextResponse.json({ error: 'Wrong email or password.' }, { status: 401 });
     }
 
-    const anonId = typeof body?.ownerId === 'string' ? body.ownerId : '';
-    if (anonId.length >= 8 && anonId.length <= 64) {
+    const claim = anonClaimFilter(body?.ownerId);
+    if (claim) {
       const botsCol = await bots();
-      await botsCol.updateMany(anonClaimFilter(anonId), { $set: { ownerId: user.id } });
+      await botsCol.updateMany(claim, { $set: { ownerId: user.id } });
     }
 
     const res = NextResponse.json({

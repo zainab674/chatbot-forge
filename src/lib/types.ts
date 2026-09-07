@@ -112,6 +112,51 @@ export interface PlatformKeyDoc {
   updatedAt: string;
 }
 
+/* ------------------------------------------------------------------ */
+/* Key requests                                                         */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Where a request stands. `pending` is the only state the admin panel asks
+ * anything of; the other two are decisions that have already been taken.
+ */
+export type KeyRequestStatus = 'pending' | 'approved' | 'declined';
+
+/**
+ * An account asking the admin to cover its model calls — either by putting a
+ * platform key in place for a provider that has none, or by topping the
+ * account up so it can run on the credits tier.
+ *
+ * Deciding a request is bookkeeping, not a grant: approving one records that
+ * the admin agreed, and the actual key or credits are set through the panel's
+ * own controls. Wiring approval to an automatic grant would mean one click in
+ * a list handing out spend, which is not a click anyone should be able to make
+ * by accident.
+ */
+export interface KeyRequestDoc {
+  id: string;
+  userId: string;
+  /**
+   * The requester's address, copied in at write time so the admin list is one
+   * query and a request still names its author after the account is deleted.
+   */
+  email: string;
+  /** Provider id from PROVIDERS. */
+  provider: string;
+  /** The model they were trying to run when they asked. May be empty. */
+  model: string;
+  /** What they typed. Shown to the admin verbatim. */
+  reason: string;
+  status: KeyRequestStatus;
+  createdAt: string;
+  updatedAt: string;
+  /** Email of the admin who decided it, set on anything past `pending`. */
+  decidedBy?: string;
+  decidedAt?: string;
+  /** The admin's reply, shown back to the requester in the builder. */
+  adminNote?: string;
+}
+
 /** Stored shape. Never send `apiKeyEnc` anywhere near a client. */
 export interface BotDoc extends BotConfig {
   id: string;
@@ -297,6 +342,14 @@ export interface LedgerDoc {
   note: string;
   reference?: string;
   createdAt: string;
+  /**
+   * Set while a referenced grant has claimed its row but has not yet moved the
+   * balance. Cleared the moment it has. A row left pending means the process
+   * died in between, so the reference is spent but the credits never landed —
+   * rare, visible, and correctable with an admin grant, which is the failure
+   * this ordering trades for never crediting the same payment twice.
+   */
+  pending?: boolean;
   /**
    * Set on `spend` rows only, which are written once per message and would
    * otherwise outgrow every other collection here. Money movements — purchases,

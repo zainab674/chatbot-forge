@@ -251,6 +251,8 @@ async function main() {
     });
     const session = (signupRes.headers.get('set-cookie') ?? '').match(/cf_session=[^;]+/)?.[0] ?? '';
     check('POST /api/auth/signup creates an account and a session', signupRes.ok && Boolean(session));
+    const signupBody = await signupRes.json().catch(() => ({}));
+    check('a new account starts with free credits', (signupBody.user?.credits ?? 0) > 0, JSON.stringify(signupBody).slice(0, 200));
     headers.cookie = session;
 
     // 1. create
@@ -782,6 +784,84 @@ async function main() {
     const afterRemove = await (await fetch(keysUrl, { headers: adminHeaders })).json();
     check('the removed key is gone from the list',
       afterRemove.providers.find((p) => p.id === 'openai').mask === null);
+
+    /* ---------------- key requests ---------------- */
+    // The third door out of the model step: a creator with no key and no
+    // credits asks the admin instead of being stuck. `plainHeaders` is a
+    // demoted, ordinary account by this point, which is exactly the caller.
+    const reqUrl = `${BASE}/api/key-requests`;
+    const adminReqUrl = `${BASE}/api/admin/key-requests`;
+
+    const askAsStranger = await fetch(reqUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider: 'openai', reason: 'no account here' }),
+    });
+    check('a logged-out caller cannot ask for a key', askAsStranger.status === 401);
+
+    const asked = await fetch(reqUrl, {
+      method: 'POST',
+      headers: plainHeaders,
+      body: JSON.stringify({ provider: 'openai', model: 'gpt-4o-mini', reason: 'support bot for my shop' }),
+    });
+    check('a logged-in account can ask for a key', asked.status === 201);
+
+    const askedTwice = await fetch(reqUrl, {
+      method: 'POST',
+      headers: plainHeaders,
+      body: JSON.stringify({ provider: 'openai', reason: 'nudging' }),
+    });
+    check('a second request for the same provider is refused', askedTwice.status === 409);
+
+    const askedBlank = await fetch(reqUrl, {
+      method: 'POST',
+      headers: plainHeaders,
+      body: JSON.stringify({ provider: 'groq', reason: '   ' }),
+    });
+    check('a request with no note is refused', askedBlank.status === 400);
+
+    const adminListAsStranger = await fetch(adminReqUrl);
+    check('a logged-out caller gets 404 from the key-request panel', adminListAsStranger.status === 404);
+    const adminListAsPlain = await fetch(adminReqUrl, { headers: plainHeaders });
+    check('the requester cannot read the panel either', adminListAsPlain.status === 404);
+
+    const panel = await (await fetch(adminReqUrl, { headers: adminHeaders })).json();
+    const filed = panel.requests?.find((r) => r.email === 'roles@example.test');
+    check('the admin sees who requested', Boolean(filed), JSON.stringify(panel).slice(0, 200));
+    check('and what they asked for', filed?.provider === 'openai' && filed?.model === 'gpt-4o-mini');
+    check('and what they wrote', filed?.reason === 'support bot for my shop');
+    check('the waiting count is shown', panel.pending === 1, String(panel.pending));
+    check('the panel never carries the requester internal id', !JSON.stringify(panel).includes('userId'));
+
+    const decideAsPlain = await fetch(adminReqUrl, {
+      method: 'PATCH',
+      headers: plainHeaders,
+      body: JSON.stringify({ id: filed?.id, status: 'approved' }),
+    });
+    check('a non-admin cannot decide a request', decideAsPlain.status === 404);
+
+    const decideBadStatus = await fetch(adminReqUrl, {
+      method: 'PATCH',
+      headers: adminHeaders,
+      body: JSON.stringify({ id: filed?.id, status: 'pending' }),
+    });
+    check('"pending" is not a decision', decideBadStatus.status === 400);
+
+    const decided = await fetch(adminReqUrl, {
+      method: 'PATCH',
+      headers: adminHeaders,
+      body: JSON.stringify({ id: filed?.id, status: 'approved', note: 'granted 200 credits' }),
+    });
+    check('an admin can answer a request', decided.ok);
+
+    const myRequests = await (await fetch(reqUrl, { headers: plainHeaders })).json();
+    const answered = myRequests.requests?.find((r) => r.id === filed?.id);
+    check('the requester sees the decision', answered?.status === 'approved', JSON.stringify(myRequests).slice(0, 200));
+    check('and the reply that came with it', answered?.adminNote === 'granted 200 credits');
+    check('and who made it', answered?.decidedBy === 'smoke@example.test');
+
+    const afterDecision = await (await fetch(adminReqUrl, { headers: adminHeaders })).json();
+    check('nothing is left waiting', afterDecision.pending === 0);
 
     /* --------- the credits tier actually spends the stored key --------- */
     // A bot with no key of its own, on an included model, pointed at the fake

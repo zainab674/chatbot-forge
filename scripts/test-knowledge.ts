@@ -369,8 +369,8 @@ group('Embedding catalog');
 check('every embedding provider id is unique', new Set(EMBEDDING_PROVIDERS.map((p) => p.id)).size === EMBEDDING_PROVIDERS.length);
 check('OpenAI is suggested for an OpenAI bot', suggestEmbeddingProvider('openai') === 'openai');
 check('Groq falls back to no embeddings', suggestEmbeddingProvider('groq') === NO_EMBEDDINGS);
-check('Anthropic falls back to no embeddings', suggestEmbeddingProvider('anthropic') === NO_EMBEDDINGS);
-check('Voyage exists for Claude users', Boolean(getEmbeddingProvider('voyage')));
+check('an unknown chat provider falls back to no embeddings', suggestEmbeddingProvider('nope') === NO_EMBEDDINGS);
+check('a standalone embedding vendor is offered too', Boolean(getEmbeddingProvider('voyage')));
 
 /* ------------------------------------------------------------------ */
 group('Context and prompt assembly');

@@ -37,11 +37,20 @@ export default async function ChatPage({ params }: { params: { id: string } }) {
   const theme = getChatTheme(bot.theme);
   const dark = theme.dark;
 
+  /*
+   * Every ancestor of the window carries a *definite* height, and that is not
+   * decoration. `min-h-screen` leaves the flex chain indefinite, so the
+   * window's own `height: 100%` had nothing to resolve against and it
+   * collapsed to its content — the composer floated mid-page with a dead band
+   * under it. `h-dvh` (which also survives a mobile URL bar) makes the chain
+   * definite the whole way down, and `min-h-0` lets the conversation scroll
+   * inside it rather than pushing the composer off the bottom.
+   */
   return (
-    <div className="flex min-h-screen flex-col" style={{ background: theme.page }}>
-      <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col p-0 sm:p-6">
+    <div className="flex h-dvh flex-col overflow-hidden" style={{ background: theme.page }}>
+      <div className="mx-auto flex h-full w-full max-w-3xl flex-col p-0 sm:px-6 sm:pb-2 sm:pt-6">
         <div
-          className={`flex flex-1 overflow-hidden sm:rounded-2xl sm:border sm:shadow-xl ${
+          className={`flex min-h-0 flex-1 overflow-hidden sm:rounded-2xl sm:border sm:shadow-xl ${
             dark ? 'sm:border-slate-800' : 'sm:border-slate-200'
           }`}
         >

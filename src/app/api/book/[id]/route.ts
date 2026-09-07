@@ -55,7 +55,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return fail('This chatbot is not allowed to run on this domain.', 403);
   }
 
-  const limit = await rateLimit(doc.id, clientKey(req.headers));
+  // Its own bucket: booking traffic must not spend the chatbot's chat allowance.
+  const limit = await rateLimit(doc.id, clientKey(req.headers), 'book');
   if (!limit.ok) {
     return NextResponse.json(
       { error: 'Too many requests. Give it a moment.' },
@@ -70,7 +71,11 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return fail('Invalid JSON body.', 400);
   }
 
-  const str = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
+  // Control and formatting characters are collapsed, not merely trimmed off the
+  // ends: `name` is interpolated into an email subject line by the owner
+  // notification, and a subject is one line whether or not the value agrees.
+  const str = (v: unknown, max: number) =>
+    typeof v === 'string' ? v.replace(/\p{C}+/gu, ' ').trim().slice(0, max) : '';
   const name = str(body?.name, 100);
   const contact = str(body?.contact, 200);
   const when = str(body?.when, 200);

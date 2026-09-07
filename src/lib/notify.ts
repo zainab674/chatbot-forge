@@ -48,3 +48,49 @@ export async function notifyOwnerOfBooking(
     ].join('\n'),
   });
 }
+
+/**
+ * Telling the admins that someone is waiting on them.
+ *
+ * Best-effort, like every other notification here: the request is already in
+ * the database and visible in /admin before this runs, so a missing mailer or
+ * a bounced address delays the answer rather than losing the request.
+ *
+ * The root ADMIN_EMAIL is included even when no account carries that address,
+ * because on a fresh deployment it is the only admin there is.
+ */
+export async function notifyAdminsOfKeyRequest(
+  req: { headers: Headers },
+  request: { email: string; providerLabel: string; model: string; reason: string },
+): Promise<void> {
+  if (!mailConfigured()) return;
+
+  const admins = await (await users())
+    .find({ role: 'admin', deletedAt: { $exists: false } }, { projection: { _id: 0, email: 1 } })
+    .limit(20)
+    .toArray();
+
+  const root = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+  const to = new Set(admins.map((a) => a.email).filter(Boolean));
+  if (root) to.add(root);
+  if (to.size === 0) return;
+
+  const base = appUrl(req);
+  const details = [`Provider: ${request.providerLabel}`, request.model && `Model: ${request.model}`].filter(Boolean);
+  const body = [
+    `${request.email} is asking for a key.`,
+    '',
+    ...details,
+    '',
+    'They wrote:',
+    request.reason,
+    '',
+    base ? `Answer it here: ${base}/admin` : 'Open the admin panel to answer it.',
+  ].join('\n');
+
+  await Promise.all(
+    [...to].map((address) =>
+      sendMail({ to: address, subject: `Key request from ${request.email}`, text: body }).catch(() => undefined),
+    ),
+  );
+}

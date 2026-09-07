@@ -1,0 +1,29 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "chatbot-forge dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--",
+        "-p",
+        "3210"
+      ],
+      "port": 3210
+    },
+    {
+      "name": "hero preview",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "--yes",
+        "serve",
+        "-l",
+        "4321",
+        "C:/Users/PMYLS/AppData/Local/Temp/claude/C--Users-PMYLS-Desktop-chatbot-forge/1be9fe88-0547-4a39-85e3-2f36b1bad7ad/scratchpad"
+      ],
+      "port": 4321
+    }
+  ]
+}

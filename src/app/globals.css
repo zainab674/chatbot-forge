@@ -101,6 +101,17 @@ body {
     opacity: 1 !important;
     transform: none !important;
   }
+  /* The landing page's reveals are driven from JavaScript, and JavaScript only
+     learns the preference once it has hydrated — until then the server's markup
+     is on screen with `opacity: 0` written into it. This is what a visitor who
+     asked for less motion sees in that gap, and `!important` is what makes it
+     outrank the inline styles the animation library writes. Every element it
+     animates is tagged `data-motion` for exactly this. */
+  [data-motion] {
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+  }
   /* The lift-on-hover is the other half of the depth pass; shadows still
      change, only the movement stops. */
   a.card:hover,
@@ -113,9 +124,22 @@ body {
   }
 }
 
+/* A bar, not a widget: no stepper arrows, and no OS-white track sitting in the
+   middle of a dark composer. `scrollbar-width` covers Firefox, which has no
+   ::-webkit pseudo-elements. */
+.thin-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(203 213 225) transparent;
+}
+.dark .thin-scroll {
+  scrollbar-color: rgb(71 85 105) transparent;
+}
 .thin-scroll::-webkit-scrollbar {
   width: 8px;
   height: 8px;
+}
+.thin-scroll::-webkit-scrollbar-button {
+  display: none;
 }
 .thin-scroll::-webkit-scrollbar-thumb {
   @apply bg-slate-300;
@@ -773,7 +797,11 @@ button.card:active {
    the content sits at the top rather than centred over the figures. From `sm`
    up the painting covers the whole block and the copy centres on it. */
 .hero-fresco {
-  @apply relative isolate flex flex-col items-center justify-start overflow-hidden rounded-card text-center shadow-lift-lg sm:justify-center;
+  /* No corner radius and no side border: this one runs edge to edge, so there
+     is no corner to round and nothing beside it to hold a line against. The
+     lift and the gilt underline stay — they are what the section below rises
+     out of. */
+  @apply relative isolate flex flex-col items-center justify-start overflow-hidden text-center shadow-lift-lg sm:justify-center;
   background-color: #e9d6b1;
   border-bottom: 2px solid #c79a55;
 }
@@ -1240,6 +1268,51 @@ button.card:active {
 }
 .tone-ink [class~="border-slate-900"] {
   border-color: #e3c89b;
+}
+
+/* The live preview is a themed surface, not part of the panel it sits in.
+   ChatWindow paints its own background — white on the light theme — and
+   brings its own slate utilities with it, so the remaps above have to stop
+   at its edge. Left alone they rewrite its text to cream and its bubbles to
+   a translucent white, which on a white surface is an empty box: the preview
+   read as blank while every element in it was present and correct.
+
+   Re-applying the canonical utilities rather than restating hex values keeps
+   this tied to the palette, and the extra `.chatwin` in each selector is what
+   wins against the remap it is undoing. A dark chat theme needs no carve-out
+   here: it asks for the light utilities the panel is already handing it. */
+.tone-ink .chatwin [class~="text-slate-400"] {
+  @apply text-slate-400;
+}
+.tone-ink .chatwin [class~="text-slate-500"] {
+  @apply text-slate-500;
+}
+.tone-ink .chatwin [class~="text-slate-600"] {
+  @apply text-slate-600;
+}
+.tone-ink .chatwin [class~="text-slate-700"] {
+  @apply text-slate-700;
+}
+.tone-ink .chatwin [class~="text-slate-800"] {
+  @apply text-slate-800;
+}
+.tone-ink .chatwin [class~="text-slate-900"] {
+  @apply text-slate-900;
+}
+.tone-ink .chatwin [class~="bg-slate-50"] {
+  @apply bg-slate-50;
+}
+.tone-ink .chatwin [class~="bg-slate-100"] {
+  @apply bg-slate-100;
+}
+.tone-ink .chatwin [class~="border-slate-100"] {
+  @apply border-slate-100;
+}
+.tone-ink .chatwin [class~="border-slate-200"] {
+  @apply border-slate-200;
+}
+.tone-ink .chatwin [class~="border-slate-300"] {
+  @apply border-slate-300;
 }
 
 .tone-sand [class~="text-slate-400"],

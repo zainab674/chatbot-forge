@@ -13,6 +13,8 @@ import {
   anonClaimFilter,
 } from '@/lib/auth';
 import { serverError } from '@/lib/http';
+import { grantCredits } from '@/lib/credits';
+import { SIGNUP_CREDITS } from '@/lib/platform';
 import { issueToken } from '@/lib/reset';
 import { sendVerification } from '@/lib/verify-mail';
 import type { UserDoc } from '@/lib/types';
@@ -83,10 +85,23 @@ export async function POST(req: NextRequest) {
       throw e;
     }
 
-    const anonId = typeof body?.ownerId === 'string' ? body.ownerId : '';
-    if (anonId.length >= 8 && anonId.length <= 64) {
+    // A new account starts with a small balance, so someone can build and
+    // test a bot the moment they sign up rather than meeting a wall on the
+    // first click. Granted rather than written straight into the document
+    // above, so the opening balance gets a ledger row like every other
+    // movement — and a grant that fails is a support ticket, not a reason to
+    // reject an account that already exists.
+    let credits = 0;
+    try {
+      ({ credits } = await grantCredits(user.id, SIGNUP_CREDITS, 'signup-bonus', 'new account'));
+    } catch (e) {
+      console.error('[chatbot-forge] signup credit grant failed:', e);
+    }
+
+    const claim = anonClaimFilter(body?.ownerId);
+    if (claim) {
       const botsCol = await bots();
-      await botsCol.updateMany(anonClaimFilter(anonId), { $set: { ownerId: user.id } });
+      await botsCol.updateMany(claim, { $set: { ownerId: user.id } });
     }
 
     // Sent, not awaited for correctness: a mailer outage must not stop someone
@@ -96,7 +111,7 @@ export async function POST(req: NextRequest) {
       .catch((e) => console.error('[chatbot-forge] verification email failed:', e));
 
     const res = NextResponse.json({
-      user: { email: user.email, credits: user.credits, isAdmin: isAdmin(user), emailVerified: false },
+      user: { email: user.email, credits, isAdmin: isAdmin(user), emailVerified: false },
     });
     res.cookies.set(SESSION_COOKIE, createSessionToken(user.id), sessionCookieOptions);
     return res;

@@ -4,7 +4,7 @@ import { decrypt } from '@/lib/crypto';
 import { ingest, MAX_CRAWL_PAGES, type IngestInput } from '@/lib/knowledge/ingest';
 import { MAX_FILE_BYTES, SUPPORTED_EXTENSIONS } from '@/lib/knowledge/extract';
 import { assertPublicUrl } from '@/lib/knowledge/crawl';
-import { readJsonObject, serverError } from '@/lib/http';
+import { declaredTooLarge, readJsonObject, serverError } from '@/lib/http';
 import { resolveOwner as ownerOf, isAnonOwner, LOGIN_REQUIRED } from '@/lib/auth';
 import { consume } from '@/lib/ratelimit';
 import type { BotDoc, SourceDoc, SourceType } from '@/lib/types';
@@ -100,6 +100,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     let input: IngestInput;
 
     if (contentType.includes('multipart/form-data')) {
+      if (declaredTooLarge(req, MAX_FILE_BYTES)) {
+        return NextResponse.json(
+          { error: `That file is larger than the ${Math.round(MAX_FILE_BYTES / 1024 / 1024)}MB limit.` },
+          { status: 413 },
+        );
+      }
       const form = await req.formData();
       const file = form.get('file');
       if (!(file instanceof File)) {

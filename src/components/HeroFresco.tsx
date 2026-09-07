@@ -168,8 +168,12 @@ export default function HeroFresco() {
       preserveAspectRatio="xMidYMax meet"
       /* The width per breakpoint is chosen so the painting is always at least
          as tall as the hero it fills — too narrow and a strip of bare gradient
-         opens above it, too wide and the crop eats the upper machine's crest. */
-      className="absolute bottom-0 left-1/2 h-auto w-[134%] -translate-x-1/2 sm:w-[142%] lg:w-[130%] xl:w-[116%]"
+         opens above it, too wide and the crop eats the upper machine's crest.
+         The multiplier falls as the frame widens because the hero now runs the
+         full viewport: what needed 134% of a phone already overshoots on a
+         desktop, and past 1536px plain 100% is more painting than the band can
+         show, which is why the hero itself starts growing there instead. */
+      className="absolute bottom-0 left-1/2 h-auto w-[134%] -translate-x-1/2 sm:w-[142%] lg:w-[130%] xl:w-[106%] 2xl:w-full"
     >
       <defs>
         {/* ---- ground ---- */}

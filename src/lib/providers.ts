@@ -1,15 +1,14 @@
 /**
  * Provider catalog.
  *
- * Almost every vendor now speaks the OpenAI /chat/completions wire format, so
- * there are only two adapters in this codebase:
- *   - "openai"    → OpenAI-compatible (OpenAI, Groq, Gemini)
- *   - "anthropic" → Anthropic Messages API (different request/stream shape)
+ * Every vendor here speaks the OpenAI /chat/completions wire format, so a
+ * single adapter covers the lot. `api` stays on each entry as the hook a
+ * future vendor with a different request or stream shape would branch on.
  *
  * Adding a new OpenAI-compatible vendor = one entry below, no other changes.
  */
 
-export type Api = 'openai' | 'anthropic';
+export type Api = 'openai';
 
 export interface Provider {
   id: string;
@@ -28,6 +27,20 @@ export interface Provider {
 
 export const PROVIDERS: Provider[] = [
   {
+    id: 'groq',
+    label: 'Groq',
+    api: 'openai',
+    baseUrl: 'https://api.groq.com/openai/v1',
+    keyUrl: 'https://console.groq.com/keys',
+    keyHint: 'gsk_...',
+    models: [
+      { id: 'openai/gpt-oss-120b', label: 'GPT-OSS 120B', note: 'very fast, good default' },
+      { id: 'openai/gpt-oss-20b', label: 'GPT-OSS 20B', note: 'fastest' },
+      { id: 'qwen/qwen3.8-27b', label: 'Qwen3.8 27B' },
+      { id: 'qwen/qwen3.6-27b', label: 'Qwen3.6 27B' },
+    ],
+  },
+  {
     id: 'openai',
     label: 'OpenAI',
     api: 'openai',
@@ -43,20 +56,6 @@ export const PROVIDERS: Provider[] = [
     ],
   },
   {
-    id: 'anthropic',
-    label: 'Anthropic (Claude)',
-    api: 'anthropic',
-    baseUrl: 'https://api.anthropic.com/v1',
-    keyUrl: 'https://console.anthropic.com/settings/keys',
-    keyHint: 'sk-ant-...',
-    models: [
-      { id: 'claude-sonnet-4-5', label: 'Claude Sonnet 4.5', note: 'best balance' },
-      { id: 'claude-opus-4-1', label: 'Claude Opus 4.1', note: 'most capable' },
-      { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5', note: 'fastest' },
-      { id: 'claude-3-5-haiku-latest', label: 'Claude 3.5 Haiku' },
-    ],
-  },
-  {
     id: 'google',
     label: 'Google Gemini',
     api: 'openai',
@@ -67,20 +66,6 @@ export const PROVIDERS: Provider[] = [
       { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', note: 'fast, very cheap' },
       { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
       { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
-    ],
-  },
-  {
-    id: 'groq',
-    label: 'Groq',
-    api: 'openai',
-    baseUrl: 'https://api.groq.com/openai/v1',
-    keyUrl: 'https://console.groq.com/keys',
-    keyHint: 'gsk_...',
-    models: [
-      { id: 'llama-3.3-70b-versatile', label: 'Llama 3.3 70B', note: 'very fast' },
-      { id: 'llama-3.1-8b-instant', label: 'Llama 3.1 8B Instant' },
-      { id: 'openai/gpt-oss-120b', label: 'GPT-OSS 120B' },
-      { id: 'moonshotai/kimi-k2-instruct', label: 'Kimi K2' },
     ],
   },
   {
@@ -98,26 +83,6 @@ export const PROVIDERS: Provider[] = [
 
 export function getProvider(id: string): Provider | undefined {
   return PROVIDERS.find((p) => p.id === id);
-}
-
-/**
- * Resolve the key to use: the creator's own key first, the platform's key
- * second.
- *
- * Kept pure — the caller fetches the platform key (see lib/platform-keys.ts)
- * and passes it in, rather than this reaching for a database or an environment
- * variable of its own. That is what makes the precedence rule testable in
- * isolation, which matters because getting it backwards would silently bill
- * the platform for traffic a creator should be paying for.
- */
-export function resolveKey(
-  provider: Provider,
-  creatorKey: string | null,
-  platformKey: string | null = null,
-): string | null {
-  if (creatorKey) return creatorKey;
-  if (platformKey) return platformKey;
-  return null;
 }
 
 /**

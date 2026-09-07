@@ -145,17 +145,22 @@ function localConsume(key: string, limit: Limit, now: number, retryAfter: number
 /**
  * @param botId  the chatbot being messaged
  * @param client a best-effort client identifier (see clientKey below)
+ * @param bucket separates unrelated activity on the same bot. Bookings and chat
+ *   used to share these counters, so a booking-form flood took the chatbot
+ *   itself offline: two different actions, one allowance, and exhausting the
+ *   cheap one denied the valuable one.
  */
-export async function rateLimit(botId: string, client: string): Promise<LimitResult> {
+export async function rateLimit(botId: string, client: string, bucket = ''): Promise<LimitResult> {
   const now = Date.now();
+  const ns = bucket ? `${bucket}:` : '';
 
   // Client first, so a visitor already over their own limit cannot keep eating
   // the bot's shared allowance and deny everyone else.
-  const clientWindow = `c:${botId}:${client}`;
+  const clientWindow = `c:${ns}${botId}:${client}`;
   const perClient = await consume(clientWindow, PER_CLIENT, now);
   if (!perClient.ok) return { ...perClient, scope: 'client' };
 
-  const perBot = await consume(`b:${botId}`, PER_BOT, now);
+  const perBot = await consume(`b:${ns}${botId}`, PER_BOT, now);
   if (!perBot.ok) {
     // Regression guard: charging the visitor for a message the bot-wide limit
     // refused used to lock them out of a chatbot that had already recovered,

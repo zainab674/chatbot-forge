@@ -179,6 +179,14 @@ export async function refundCredits(userId: string, amount: number, note = ''): 
  * `reference` makes it idempotent: a Stripe webhook delivered three times
  * carries the same event id all three times, and the unique index on that
  * field turns the retries into no-ops instead of free money.
+ *
+ * The ordering is the whole trick. Reading the ledger and *then* crediting is
+ * not idempotent at all: Stripe retries after a timeout, so the retry can
+ * arrive while the first delivery is still in flight, both find no row, and
+ * both pay out. Worse, the losing insert then failed inside `record`, which
+ * swallows write errors — so the second grant landed with no audit row at all.
+ * Claiming the row first makes the unique index the thing that decides, and it
+ * decides atomically.
  */
 export async function grantCredits(
   userId: string,
@@ -189,10 +197,10 @@ export async function grantCredits(
 ): Promise<{ credits: number; alreadyApplied: boolean }> {
   const usersCol = await users();
 
+  let claimedRowId: string | null = null;
   if (reference) {
-    const ledgerCol = await ledger();
-    const seen = await ledgerCol.findOne({ reference });
-    if (seen) {
+    claimedRowId = await claimReference(userId, amount, reason, note, reference);
+    if (!claimedRowId) {
       const user = await usersCol.findOne({ id: userId });
       return { credits: user?.credits ?? 0, alreadyApplied: true };
     }
@@ -211,8 +219,56 @@ export async function grantCredits(
     credits = 0;
   }
 
-  await record(userId, amount, credits, reason, note, reference);
+  if (claimedRowId) {
+    // The balance is only known now, and the row stops being pending with it.
+    try {
+      const col = await ledger();
+      await col.updateOne({ id: claimedRowId }, { $set: { balanceAfter: credits }, $unset: { pending: '' } });
+    } catch (e) {
+      console.warn('[chatbot-forge] ledger row could not be completed:', claimedRowId, (e as Error)?.message);
+    }
+  } else {
+    await record(userId, amount, credits, reason, note);
+  }
   return { credits, alreadyApplied: false };
+}
+
+/**
+ * Reserves the ledger row for a referenced grant, before any credits move.
+ *
+ * Returns the new row's id, or null when this reference has already been paid
+ * out. Unlike `record`, a failure here is *not* swallowed: the whole point is
+ * that the duplicate-key error is the answer, so anything else has to surface
+ * rather than be mistaken for a fresh grant.
+ */
+async function claimReference(
+  userId: string,
+  delta: number,
+  reason: LedgerReason,
+  note: string,
+  reference: string,
+): Promise<string | null> {
+  const row: LedgerDoc = {
+    id: newId(),
+    userId,
+    delta,
+    // Filled in by the caller once the balance has actually moved.
+    balanceAfter: 0,
+    reason,
+    note: note.slice(0, 300),
+    reference,
+    pending: true,
+    createdAt: new Date().toISOString(),
+  };
+  try {
+    const col = await ledger();
+    await col.insertOne(row as any);
+    return row.id;
+  } catch (e: any) {
+    // The unique index on `reference` rejected it: this payment is already paid.
+    if (e?.code === 11000) return null;
+    throw e;
+  }
 }
 
 async function record(

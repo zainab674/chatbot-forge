@@ -3,10 +3,11 @@ import { getProvider } from '@/lib/providers';
 import { completeChat, UpstreamError } from '@/lib/llm';
 import { consume, clientKey, PER_EXPENSIVE, type Limit } from '@/lib/ratelimit';
 import { TALKING_STYLES } from '@/lib/styles';
-import { platformGrant, refundCredits, creditsFor } from '@/lib/credits';
+import { platformGrant, refundCredits, creditsFor, type DenyReason } from '@/lib/credits';
 import { getPlatformKey } from '@/lib/platform-keys';
 import { PLATFORM_MODELS } from '@/lib/platform';
-import { sessionUserId } from '@/lib/auth';
+import { sessionOf, sessionRevoked } from '@/lib/auth';
+import { users } from '@/lib/mongodb';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -36,6 +37,47 @@ Rules:
 - Write in the same language the description is written in.
 - Never invent specific facts (prices, emails, URLs, policies) that are not in the description; keep those parts generic instead.
 - The info text is the bot's source of truth: include every concrete fact from the description, organised under headings.`;
+
+/**
+ * Why the platform key was not handed over, said to the person building the
+ * bot rather than to a visitor of a finished one — so it names the thing they
+ * can actually act on. The catalogue in lib/credits addresses the visitor,
+ * which is the wrong audience here, and this route used to ignore the reason
+ * altogether: an account simply out of credits was told the platform had no
+ * key stored, which sent people to /admin to re-enter a key that was already
+ * there.
+ */
+function keyDenial(reason: DenyReason | undefined, model: string): string {
+  switch (reason) {
+    case 'no-credits':
+      return 'Your account is out of platform credits, so this cannot run on the platform key. Top up your credits, or paste your own API key in the Model section.';
+    case 'model-not-included':
+      return `${model} is not covered by platform credits. Pick GPT-OSS on Groq, Gemini Flash or GPT-4o mini, or paste your own API key in the Model section.`;
+    case 'no-platform-key':
+      return 'The platform has no key stored for this provider yet. Paste your own API key in the Model section, or pick a provider the platform has a key for.';
+    default:
+      return 'Enter your API key in the Model section first — or pick a model covered by platform credits (GPT-OSS on Groq, Gemini Flash, GPT-4o mini).';
+  }
+}
+
+/**
+ * The account this request may spend credits from, or null.
+ *
+ * A signed cookie alone is not enough on a path that moves money. The token is
+ * self-contained, so "sign out everywhere" and a password reset can only take
+ * effect by checking the account's `sessionsValidFrom` on the way in — and a
+ * deletion in flight has already marked the row. Every other authenticated
+ * route in the app does this; this one used to take the id straight off the
+ * cookie, which left a stolen session able to spend the balance it was
+ * supposedly signed out of.
+ */
+async function spendingAccountId(req: NextRequest): Promise<string | null> {
+  const session = sessionOf(req);
+  if (!session) return null;
+  const user = await (await users()).findOne({ id: session.userId });
+  if (!user || user.deletedAt || sessionRevoked(session, user)) return null;
+  return user.id;
+}
 
 export async function POST(req: NextRequest) {
   const fail = (message: string, status: number) => NextResponse.json({ error: message }, { status });
@@ -74,14 +116,18 @@ export async function POST(req: NextRequest) {
   let charged = 0;
   const price = creditsFor(SYSTEM.length + description.length, GENERATE_MAX_TOKENS);
 
+  let denied: DenyReason | undefined;
+
   if (!apiKey) {
-    const uid = sessionUserId(req);
+    const uid = await spendingAccountId(req);
     if (uid) {
       const platform = await platformGrant(uid, provider.id, model, price);
       if (platform.grant) {
         apiKey = platform.grant.apiKey;
         platformUserId = platform.grant.userId;
         charged = platform.grant.charged;
+      } else {
+        denied = platform.reason;
       }
     } else if (PLATFORM_MODELS.has(model)) {
       // Anonymous generation on the platform's money is the top of the signup
@@ -96,13 +142,14 @@ export async function POST(req: NextRequest) {
         );
       }
       apiKey = await getPlatformKey(provider.id);
+      if (!apiKey) denied = 'no-platform-key';
+    } else {
+      denied = 'model-not-included';
     }
   }
   if (!apiKey) {
-    return fail(
-      'Enter your API key in the Model section first — or pick a model covered by platform credits (GPT-4o mini, Gemini Flash, Claude Haiku, Llama on Groq). If credits should be covering this, the platform has no key stored for this provider yet.',
-      400,
-    );
+    console.warn('[chatbot-forge] generate denied:', denied ?? 'no-key', provider.id, model);
+    return fail(keyDenial(denied, model), 400);
   }
 
   let raw: string;

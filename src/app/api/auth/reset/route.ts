@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { users } from '@/lib/mongodb';
 import { hashPassword, createSessionToken, sessionCookieOptions, SESSION_COOKIE, isAdmin } from '@/lib/auth';
 import { consume, clientKey, PER_AUTH } from '@/lib/ratelimit';
-import { consumeToken, revokeSessions, clearTokens } from '@/lib/reset';
+import { consumeToken, clearTokens } from '@/lib/reset';
 import { serverError } from '@/lib/http';
 
 export const runtime = 'nodejs';

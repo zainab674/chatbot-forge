@@ -1,4 +1,4 @@
-import { assertReachableEndpoint } from '../net-guard';
+import { endpointFetch } from '../net-guard';
 import { EmbeddingError, normalise, type EmbedArgs } from './embed';
 
 /**
@@ -9,7 +9,7 @@ import { EmbeddingError, normalise, type EmbedArgs } from './embed';
  * DNS to check where a creator's custom endpoint actually points.
  */
 
-/** Providers cap batch size; 96 is comfortably under every one of them. */
+/** Providers cap batch size; 64 is comfortably under every one of them. */
 const BATCH = 64;
 
 export async function embedTexts(args: EmbedArgs): Promise<number[][]> {
@@ -24,34 +24,43 @@ async function embedBatch(a: EmbedArgs): Promise<number[][]> {
   const baseUrl = (a.baseUrl || a.provider.baseUrl).replace(/\/$/, '');
   if (!baseUrl) throw new EmbeddingError('No embedding endpoint configured.', 400);
 
-  // A creator-supplied endpoint gets the crawler's SSRF checks: this is a URL
-  // from a bot document being handed to fetch, which is the same shape of hole
-  // as pasting a URL into the knowledge base.
-  if (baseUrl !== a.provider.baseUrl.replace(/\/$/, '')) {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (a.apiKey) headers.Authorization = `Bearer ${a.apiKey}`;
+  const body = JSON.stringify({
+    model: a.model,
+    input: a.input,
+    // Ignored by providers that do not use it.
+    encoding_format: 'float',
+  });
+
+  const isVendor = baseUrl === a.provider.baseUrl.replace(/\/$/, '');
+  let res: Response;
+  if (isVendor) {
+    res = await fetch(`${baseUrl}/embeddings`, {
+      method: 'POST',
+      headers,
+      signal: a.signal,
+      redirect: 'follow',
+      body,
+    });
+  } else {
+    // A creator-supplied endpoint gets the crawler's SSRF treatment: this is a
+    // URL out of a bot document being handed to fetch, the same shape of hole
+    // as pasting one into the knowledge base. `endpointFetch` validates it and
+    // then connects to the address it validated, so the name cannot resolve
+    // somewhere else between the check and the socket.
     try {
-      await assertReachableEndpoint(baseUrl);
+      res = await endpointFetch(`${baseUrl}/embeddings`, { method: 'POST', headers, signal: a.signal, body });
     } catch (e) {
       throw new EmbeddingError(`Custom embedding endpoint rejected: ${(e as Error).message}`, 400);
     }
+    // Never followed: a redirect could point at an internal address that no
+    // check ever saw.
+    if (res.status >= 300 && res.status < 400) {
+      res.body?.cancel().catch(() => {});
+      throw new EmbeddingError('That custom embedding endpoint redirected the request, which is not allowed.', 502);
+    }
   }
-
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (a.apiKey) headers.Authorization = `Bearer ${a.apiKey}`;
-
-  const res = await fetch(`${baseUrl}/embeddings`, {
-    method: 'POST',
-    headers,
-    signal: a.signal,
-    // A custom endpoint must not redirect the request onto an internal address
-    // the check above never saw.
-    redirect: baseUrl === a.provider.baseUrl.replace(/\/$/, '') ? 'follow' : 'error',
-    body: JSON.stringify({
-      model: a.model,
-      input: a.input,
-      // Ignored by providers that do not use it.
-      encoding_format: 'float',
-    }),
-  });
 
   if (!res.ok) {
     let detail = '';

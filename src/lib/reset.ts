@@ -1,4 +1,4 @@
-import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { passwordResets, users } from './mongodb';
 import type { ResetDoc, UserDoc } from './types';
 
@@ -106,9 +106,3 @@ export async function clearTokens(userId: string, purpose: TokenPurpose): Promis
   await col.deleteMany({ userId, purpose } as any);
 }
 
-/** Constant-time compare, for anywhere a token is checked outside Mongo. */
-export function tokensMatch(a: string, b: string): boolean {
-  const x = Buffer.from(a);
-  const y = Buffer.from(b);
-  return x.length === y.length && timingSafeEqual(x, y);
-}

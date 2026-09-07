@@ -9,10 +9,8 @@ export const PLATFORM_MODELS = new Set([
   'gpt-4.1-mini',
   'gemini-2.5-flash',
   'gemini-2.0-flash',
-  'claude-haiku-4-5',
-  'claude-3-5-haiku-latest',
-  'llama-3.3-70b-versatile',
-  'llama-3.1-8b-instant',
+  'openai/gpt-oss-120b',
+  'openai/gpt-oss-20b',
 ]);
 
 /**
@@ -21,3 +19,21 @@ export const PLATFORM_MODELS = new Set([
  * running a real widget.
  */
 export const ANON_TRIAL_MESSAGES = 10;
+
+/**
+ * Credits a new account starts with.
+ *
+ * One credit is roughly one message or one generation on an included model
+ * (see creditsFor), so this is a handful of real conversations: enough to
+ * build a bot, talk to it and decide, before anyone is asked for a card.
+ */
+export const SIGNUP_CREDITS = 25;
+
+/**
+ * Longest note a creator may attach when asking the admin for a key.
+ *
+ * Here rather than in lib/key-requests.ts for the same reason as everything
+ * else in this file: the builder counts characters in the browser, and that
+ * component must not drag the MongoDB-backed request logic in with it.
+ */
+export const KEY_REQUEST_MAX_CHARS = 600;

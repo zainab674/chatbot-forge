@@ -24,6 +24,29 @@ export async function readJsonObject(
 }
 
 /**
+ * How much a multipart envelope may add on top of the file itself — boundaries,
+ * part headers, the other fields. Generous; the exact figure does not matter,
+ * only that it is bounded.
+ */
+const MULTIPART_OVERHEAD = 64 * 1024;
+
+/**
+ * Rejects an oversized upload from its Content-Length, before the body is read.
+ *
+ * `req.formData()` buffers the whole request into memory, so checking
+ * `file.size` afterwards spends exactly the memory the limit exists to protect
+ * — a ceiling enforced only after you have paid for the thing is not a ceiling.
+ *
+ * Content-Length is client-supplied, so this is a cheap first gate rather than
+ * the authority: understating it buys nothing, because the check on the parsed
+ * file still runs and still refuses.
+ */
+export function declaredTooLarge(req: NextRequest, maxBytes: number): boolean {
+  const declared = Number(req.headers.get('content-length'));
+  return Number.isFinite(declared) && declared > maxBytes + MULTIPART_OVERHEAD;
+}
+
+/**
  * Turns an unexpected exception into a 500 without echoing internals.
  *
  * Configuration problems the operator can fix are worth surfacing, so a small

@@ -1,3 +1,4 @@
+import { endpointFetch } from './net-guard';
 import type { ChatMessage } from './types';
 import type { Provider } from './providers';
 
@@ -13,23 +14,47 @@ export interface StreamArgs {
   signal?: AbortSignal;
 }
 
+/** True when this is the vendor's own documented endpoint, not a creator's. */
+function isVendorEndpoint(a: StreamArgs): boolean {
+  return a.baseUrl.replace(/\/$/, '') === a.provider.baseUrl.replace(/\/$/, '');
+}
+
 /**
- * A custom endpoint must not be allowed to bounce the request somewhere else:
- * following a 302 to 169.254.169.254 would hand an attacker the deployment's
- * metadata service, and the URL check the caller ran only covered the first
- * hop. Vendor endpoints never redirect, so this costs nothing.
+ * POSTs to the endpoint, by the route appropriate to who chose it.
+ *
+ * A vendor endpoint is a constant in this repo, so it gets the platform's
+ * ordinary fetch. A creator's custom endpoint is a URL from a bot document and
+ * gets `endpointFetch`, which connects only to the address the SSRF check
+ * cleared — otherwise the hostname is resolved once for the check and again for
+ * the connection, and only the second one decides where the request goes.
+ *
+ * Redirects on that path are refused rather than followed: a 302 to
+ * 169.254.169.254 would hand over the deployment's metadata service, and the
+ * check the caller ran only ever covered the first hop.
  */
-function redirectMode(a: StreamArgs): RequestRedirect {
-  return a.baseUrl.replace(/\/$/, '') === a.provider.baseUrl.replace(/\/$/, '') ? 'follow' : 'error';
+async function post(a: StreamArgs, url: string, body: string): Promise<Response> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (a.apiKey) headers.Authorization = `Bearer ${a.apiKey}`;
+
+  if (isVendorEndpoint(a)) {
+    return fetch(url, { method: 'POST', headers, signal: a.signal, redirect: 'follow', body });
+  }
+
+  const res = await endpointFetch(url, { method: 'POST', headers, signal: a.signal, body });
+  if (res.status >= 300 && res.status < 400) {
+    res.body?.cancel().catch(() => {});
+    throw new UpstreamError('That custom endpoint redirected the request, which is not allowed.', 502);
+  }
+  return res;
 }
 
 /**
  * Calls the upstream provider and returns a ReadableStream of plain UTF-8 text
- * deltas. Both adapters normalise to the same output, so the API route and the
- * client never need to know which vendor answered.
+ * deltas, so the API route and the client never need to know which vendor
+ * answered.
  */
 export async function streamChat(args: StreamArgs): Promise<ReadableStream<Uint8Array>> {
-  return args.provider.api === 'anthropic' ? streamAnthropic(args) : streamOpenAICompatible(args);
+  return streamOpenAICompatible(args);
 }
 
 /**
@@ -37,47 +62,16 @@ export async function streamChat(args: StreamArgs): Promise<ReadableStream<Uint8
  * whole reply is parsed as JSON so streaming buys nothing.
  */
 export async function completeChat(a: StreamArgs): Promise<string> {
-  if (a.provider.api === 'anthropic') {
-    if (!a.apiKey) throw new UpstreamError('No Anthropic API key configured.', 401);
-    const res = await fetch(`${a.baseUrl.replace(/\/$/, '')}/messages`, {
-      method: 'POST',
-      signal: a.signal,
-      redirect: redirectMode(a),
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': a.apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: a.model,
-        system: a.system,
-        max_tokens: a.maxTokens,
-        temperature: a.temperature,
-        messages: a.messages.map((m) => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content })),
-      }),
-    });
-    if (!res.ok) throw new UpstreamError(await describeError(res), res.status);
-    const json = await res.json();
-    return (json?.content ?? [])
-      .filter((b: any) => b?.type === 'text')
-      .map((b: any) => b.text)
-      .join('');
-  }
-
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (a.apiKey) headers.Authorization = `Bearer ${a.apiKey}`;
-  const res = await fetch(`${a.baseUrl.replace(/\/$/, '')}/chat/completions`, {
-    method: 'POST',
-    headers,
-    signal: a.signal,
-    redirect: redirectMode(a),
-    body: JSON.stringify({
+  const res = await post(
+    a,
+    `${a.baseUrl.replace(/\/$/, '')}/chat/completions`,
+    JSON.stringify({
       model: a.model,
       temperature: a.temperature,
       max_tokens: a.maxTokens,
       messages: [{ role: 'system', content: a.system }, ...a.messages],
     }),
-  });
+  );
   if (!res.ok) throw new UpstreamError(await describeError(res), res.status);
   const json = await res.json();
   return json?.choices?.[0]?.message?.content ?? '';
@@ -88,23 +82,17 @@ export async function completeChat(a: StreamArgs): Promise<string> {
 /* ------------------------------------------------------------------ */
 
 async function streamOpenAICompatible(a: StreamArgs): Promise<ReadableStream<Uint8Array>> {
-  const url = `${a.baseUrl.replace(/\/$/, '')}/chat/completions`;
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (a.apiKey) headers.Authorization = `Bearer ${a.apiKey}`;
-
-  const res = await fetch(url, {
-    method: 'POST',
-    headers,
-    signal: a.signal,
-    redirect: redirectMode(a),
-    body: JSON.stringify({
+  const res = await post(
+    a,
+    `${a.baseUrl.replace(/\/$/, '')}/chat/completions`,
+    JSON.stringify({
       model: a.model,
       stream: true,
       temperature: a.temperature,
       max_tokens: a.maxTokens,
       messages: [{ role: 'system', content: a.system }, ...a.messages],
     }),
-  });
+  );
 
   if (!res.ok || !res.body) throw new UpstreamError(await describeError(res), res.status);
 
@@ -113,43 +101,6 @@ async function streamOpenAICompatible(a: StreamArgs): Promise<ReadableStream<Uin
     // Some vendors put the text in `content`, reasoning models may also emit
     // `reasoning_content` — we only surface the visible answer.
     if (typeof delta?.content === 'string') return delta.content;
-    return '';
-  });
-}
-
-/* ------------------------------------------------------------------ */
-/* Anthropic Messages API                                               */
-/* ------------------------------------------------------------------ */
-
-async function streamAnthropic(a: StreamArgs): Promise<ReadableStream<Uint8Array>> {
-  if (!a.apiKey) throw new UpstreamError('No Anthropic API key configured for this chatbot.', 401);
-
-  const res = await fetch(`${a.baseUrl.replace(/\/$/, '')}/messages`, {
-    method: 'POST',
-    signal: a.signal,
-    redirect: redirectMode(a),
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': a.apiKey,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: a.model,
-      stream: true,
-      system: a.system,
-      max_tokens: a.maxTokens,
-      temperature: a.temperature,
-      messages: a.messages.map((m) => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content })),
-    }),
-  });
-
-  if (!res.ok || !res.body) throw new UpstreamError(await describeError(res), res.status);
-
-  return sseToText(res.body, (json) => {
-    if (json?.type === 'content_block_delta' && json?.delta?.type === 'text_delta') {
-      return json.delta.text ?? '';
-    }
-    if (json?.type === 'error') throw new UpstreamError(json?.error?.message || 'Upstream error', 502);
     return '';
   });
 }
@@ -168,31 +119,55 @@ function sseToText(
   let buffer = '';
 
   return new ReadableStream<Uint8Array>({
+    /**
+     * Reads until there is something to hand on, or the upstream body ends.
+     *
+     * The loop is the whole point. A `pull` that consumes a chunk and enqueues
+     * nothing is never called again — the stream has no queued data and no
+     * pending pull, so nothing wakes it and the reply hangs forever with the
+     * answer already sitting in the socket. Frames carrying no visible text are
+     * routine: the role-only opening frame, keep-alives, and, on a reasoning
+     * model, every frame of the thinking phase before the answer starts.
+     */
     async pull(controller) {
-      const { done, value } = await reader.read();
-      if (done) {
-        controller.close();
-        return;
-      }
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() ?? '';
-
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed.startsWith('data:')) continue;
-        const data = trimmed.slice(5).trim();
-        if (!data || data === '[DONE]') continue;
+      for (;;) {
+        let done: boolean;
+        let value: Uint8Array | undefined;
         try {
-          const text = pick(JSON.parse(data));
-          if (text) controller.enqueue(encoder.encode(text));
+          ({ done, value } = await reader.read());
         } catch (e) {
-          if (e instanceof UpstreamError) {
-            controller.error(e);
-            return;
-          }
-          // Ignore keep-alives and partial frames.
+          controller.error(e);
+          return;
         }
+        if (done) {
+          controller.close();
+          return;
+        }
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+
+        let enqueued = false;
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith('data:')) continue;
+          const data = trimmed.slice(5).trim();
+          if (!data || data === '[DONE]') continue;
+          try {
+            const text = pick(JSON.parse(data));
+            if (text) {
+              controller.enqueue(encoder.encode(text));
+              enqueued = true;
+            }
+          } catch (e) {
+            if (e instanceof UpstreamError) {
+              controller.error(e);
+              return;
+            }
+            // Ignore keep-alives and partial frames.
+          }
+        }
+        if (enqueued) return;
       }
     },
     cancel(reason) {

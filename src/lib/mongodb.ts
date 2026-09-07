@@ -10,6 +10,7 @@ import type {
   ResetDoc,
   ConversationDoc,
   LedgerDoc,
+  KeyRequestDoc,
 } from './types';
 import * as fake from './mongodb.fake';
 
@@ -37,11 +38,24 @@ declare global {
   var _cfMongo: { client: MongoClient; promise: Promise<MongoClient> } | undefined;
 }
 
+/**
+ * The shared client, connected once per process.
+ *
+ * The cache is cleared when the connection attempt fails. Holding on to a
+ * rejected promise means every later request awaits that same rejection: one
+ * unlucky moment at startup — Atlas mid-failover, DNS not up yet — and the
+ * deployment stays down until something restarts it, long after the database
+ * came back. Dropping it lets the next request try again.
+ */
 function getClient(): Promise<MongoClient> {
   if (!uri) throw new Error('MONGODB_URI is not set. Add it to .env.local.');
   if (!global._cfMongo) {
     const client = new MongoClient(uri, { maxPoolSize: 10 });
-    global._cfMongo = { client, promise: client.connect() };
+    const promise = client.connect().catch((e) => {
+      if (global._cfMongo?.promise === promise) global._cfMongo = undefined;
+      throw e;
+    });
+    global._cfMongo = { client, promise };
   }
   return global._cfMongo.promise;
 }
@@ -63,7 +77,9 @@ type IndexSpec = IndexSpecification | { key: IndexSpecification; options: Create
 
 /** Creates each collection's indexes once per process, then gets out of the way. */
 async function collection<T extends Document>(name: string, indexes: IndexSpec[] = []): Promise<Collection<T>> {
-  if (fakeDb()) return fake.collection(name);
+  // The index specs go across too: the fake enforces the unique ones, because
+  // several of them are rules the app depends on rather than optimisations.
+  if (fakeDb()) return fake.collection(name, indexes);
 
   const db = await getDb();
   const col = db.collection<T>(name);
@@ -141,6 +157,9 @@ export function conversations(): Promise<Collection<ConversationDoc>> {
   return collection<ConversationDoc>('conversations', [
     { id: 1 },
     { botId: 1, updatedAt: -1 },
+    // Account export and account deletion both sweep by owner, and both would
+    // otherwise scan every transcript on the platform to do it.
+    { ownerId: 1 },
     { key: { expiresAt: 1 }, options: { expireAfterSeconds: 0 } },
   ]);
 }
@@ -164,9 +183,32 @@ export function ledger(): Promise<Collection<LedgerDoc>> {
 /**
  * The platform's own provider keys, set by an admin in /admin. One document per
  * provider; these replaced the OPENAI_API_KEY-style environment variables.
+ *
+ * `unique`, because "one document per provider" is the rule the reader relies
+ * on: `getPlatformKey` takes the first match, so a second row for the same
+ * provider — two admins saving a rotated key at once through an upsert — would
+ * leave which key gets spent down to document order.
  */
 export function platformKeys(): Promise<Collection<PlatformKeyDoc>> {
-  return collection<PlatformKeyDoc>('platformKeys', [{ provider: 1 }]);
+  return collection<PlatformKeyDoc>('platformKeys', [
+    { key: { provider: 1 }, options: { unique: true } },
+  ]);
+}
+
+/**
+ * Accounts asking the admin to cover their model calls.
+ *
+ * No TTL here on purpose: a request is the record of a decision someone made
+ * about spend, and the last two indexes are the two questions ever asked of
+ * it: "what have I asked for" on the builder side, and "what is still waiting"
+ * on the panel side.
+ */
+export function keyRequests(): Promise<Collection<KeyRequestDoc>> {
+  return collection<KeyRequestDoc>('keyRequests', [
+    { id: 1 },
+    { userId: 1, createdAt: -1 },
+    { status: 1, createdAt: -1 },
+  ]);
 }
 
 /**

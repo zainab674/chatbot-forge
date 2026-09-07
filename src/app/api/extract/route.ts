@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { extractFile, MAX_FILE_BYTES, SUPPORTED_EXTENSIONS } from '@/lib/knowledge/extract';
 import { consume, clientKey, PER_EXPENSIVE } from '@/lib/ratelimit';
-import { serverError } from '@/lib/http';
+import { declaredTooLarge, serverError } from '@/lib/http';
 import { LIMITS } from '@/lib/validate';
 
 export const runtime = 'nodejs';
@@ -33,6 +33,12 @@ export async function POST(req: NextRequest) {
     const contentType = req.headers.get('content-type') ?? '';
     if (!contentType.includes('multipart/form-data')) {
       return fail('Send the file as multipart/form-data.', 415);
+    }
+
+    // Before the body is read, not after: this endpoint needs no account, so
+    // whatever arrives here arrives from anyone.
+    if (declaredTooLarge(req, MAX_FILE_BYTES)) {
+      return fail(`That file is larger than the ${Math.round(MAX_FILE_BYTES / 1024 / 1024)}MB limit.`, 413);
     }
 
     const form = await req.formData();

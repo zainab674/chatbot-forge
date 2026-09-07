@@ -1,13 +1,25 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import Markdown from './Markdown';
 import ChatScene from './ChatScene';
 import { accessibleSurface } from '@/lib/contrast';
 import type { Citation, PublicBot } from '@/lib/types';
 import { getChatTheme, type ChatTheme } from '@/lib/themes';
+import { randomId } from '@/lib/random-id';
 
 type Msg = { role: 'user' | 'assistant'; content: string; citations?: Citation[] };
+
+/** How tall the composer is allowed to grow before it starts scrolling. Matches
+ *  the `max-h-36` on the textarea, which is the backstop for the frame before
+ *  the measurement below runs. */
+const COMPOSER_MAX = 144;
+
+/** `useLayoutEffect` everywhere it exists, `useEffect` on the server, where it
+ *  would only warn. Kept local rather than imported from the landing page's
+ *  motion primitives: this component is the embeddable widget's payload and has
+ *  no business pulling an animation library into that bundle. */
+const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
 /** The origin of the page that framed this chat, or '' when it stands alone. */
 function hostPageOrigin(): string {
@@ -50,11 +62,10 @@ export default function ChatWindow({
    * rather than a pile of one-message rows. Generated in the browser and never
    * reused across page loads: it identifies a conversation, not a person.
    */
-  const conversationId = useRef(
-    typeof crypto !== 'undefined' && crypto.randomUUID
-      ? crypto.randomUUID().replace(/-/g, '')
-      : Math.random().toString(36).slice(2).padEnd(16, '0'),
-  );
+  // Guessing one lets someone overwrite a stranger's stored transcript, since
+  // the server keys the record on it — so this wants real randomness, which is
+  // what `randomId` is careful about when crypto.randomUUID is unavailable.
+  const conversationId = useRef(randomId());
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const theme = getChatTheme(bot.theme);
@@ -64,6 +75,50 @@ export default function ChatWindow({
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages, streaming]);
+
+  /* The composer grows to its contents up to COMPOSER_MAX and scrolls past it.
+     Two things make that more than a one-line onChange handler:
+
+       - an empty textarea is not necessarily a one-line textarea. A `rows={1}`
+         box in a narrow widget wraps a long placeholder onto a second line,
+         which overflows the row and puts a scrollbar beside a composer nobody
+         has typed in yet. Measuring covers the placeholder too, so the box
+         opens at the height its own hint needs.
+       - the height is an inline style, so nothing clears it when `send` empties
+         the input. A long message used to leave the composer standing at three
+         lines of nothing after it was sent.
+
+     Both are the same fix: measure whenever the value could have changed, not
+     only when the visitor typed. The scrollbar is then hidden until it means
+     something — content genuinely past the cap. */
+  const fitComposer = useCallback(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    const wanted = el.scrollHeight;
+    el.style.height = `${Math.min(COMPOSER_MAX, wanted)}px`;
+    el.style.overflowY = wanted > COMPOSER_MAX ? 'auto' : 'hidden';
+  }, []);
+
+  /* Layout, not effect: the box is sized in the same frame it is painted, so
+     a sent message does not flash the old height on its way back to one row. */
+  useIsoLayoutEffect(fitComposer, [fitComposer, input, bot.placeholder]);
+
+  /* Width decides where the text wraps, so a resized window — or a widget
+     panel opening at a different size — changes the height the same text
+     needs. Only width is worth reacting to; height changes are our own. */
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    let last = el.clientWidth;
+    const ro = new ResizeObserver(() => {
+      if (el.clientWidth === last) return;
+      last = el.clientWidth;
+      fitComposer();
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [fitComposer]);
 
   const send = useCallback(
     async (text: string) => {
@@ -134,7 +189,12 @@ export default function ChatWindow({
         const raw = res.headers.get('x-citations');
         if (raw) {
           try {
-            citations = JSON.parse(decodeURIComponent(escape(atob(raw))));
+            // atob yields one byte per char; the header was UTF-8 before it was
+            // base64, so it has to be decoded as such. (The old
+            // decodeURIComponent(escape(...)) spelling relied on `escape`,
+            // which is deprecated and gone in some strict environments.)
+            const bytes = Uint8Array.from(atob(raw), (c) => c.charCodeAt(0));
+            citations = JSON.parse(new TextDecoder().decode(bytes));
           } catch {
             citations = undefined;
           }
@@ -146,7 +206,12 @@ export default function ChatWindow({
         // eslint-disable-next-line no-constant-condition
         while (true) {
           const { done, value } = await reader.read();
-          if (done) break;
+          // The final flush: without it a reply whose last character straddles
+          // two chunks loses that character.
+          if (done) {
+            acc += decoder.decode();
+            break;
+          }
           acc += decoder.decode(value, { stream: true });
           setMessages((prev) => {
             const copy = [...prev];
@@ -188,12 +253,24 @@ export default function ChatWindow({
       className={[
         dark ? 'dark text-slate-100' : 'text-slate-900',
         'relative flex flex-col overflow-hidden',
-        fill ? 'h-full w-full' : 'h-[640px] w-full max-w-2xl rounded-2xl border shadow-xl',
+        // `h-full` alone only works when every ancestor has a definite height;
+        // where one is sized by `min-h-*` or `flex-1` the percentage has
+        // nothing to resolve against and the window collapses to its content,
+        // leaving the composer stranded above a dead band. `flex-1` fills the
+        // slack in those parents instead.
+        fill ? 'h-full min-h-0 w-full flex-1' : 'h-[640px] w-full max-w-2xl rounded-2xl border shadow-xl',
         !fill && (dark ? 'border-slate-700' : 'border-slate-200'),
       ]
         .filter(Boolean)
         .join(' ')}
-      style={{ ['--accent' as any]: bot.accent, background: theme.surface }}
+      style={{
+        ['--accent' as any]: bot.accent,
+        background: theme.surface,
+        // Native widgets inside the window — the composer's scrollbar above
+        // all — follow the theme rather than the OS, so a dark chat never gets
+        // a white stepper control dropped into its input.
+        colorScheme: dark ? 'dark' : 'light',
+      }}
     >
       <ChatScene theme={theme} busy={streaming} />
 
@@ -242,118 +319,124 @@ export default function ChatWindow({
 
       {booking && <BookingForm bot={bot} dark={dark} demo={demo} onClose={() => setBooking(false)} />}
 
-      <div ref={scrollRef} className="thin-scroll relative flex-1 space-y-3 overflow-y-auto px-4 py-4">
-        {showIntro && (
-          <div className="animate-fade-up">
-            <Bubble theme={theme} accent={bot.accent} role="assistant" emoji={bot.avatarEmoji}>
-              <Markdown text={bot.greeting || `Hi! I'm ${bot.name}.`} />
-            </Bubble>
-            {bot.suggestions.length > 0 && (
-              <div className="mt-3 flex flex-wrap gap-2 pl-10">
-                {bot.suggestions.map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => send(s)}
-                    className={`rounded-full border px-3 py-1.5 text-xs transition ${
-                      dark
-                        ? 'border-slate-700 text-slate-300 hover:bg-slate-800'
-                        : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                    }`}
-                  >
-                    {s}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {messages.map((m, i) => (
-          <div key={i}>
-            <Bubble theme={theme} accent={bot.accent} role={m.role} emoji={bot.avatarEmoji}>
-              {m.content ? (
-                <Markdown text={m.content} />
-              ) : (
-                <span className="inline-flex gap-1 py-1" aria-label="Thinking">
-                  <Dot delay="0s" />
-                  <Dot delay=".2s" />
-                  <Dot delay=".4s" />
-                </span>
+      <div ref={scrollRef} className="thin-scroll relative min-h-0 flex-1 overflow-y-auto">
+        {/* The column is capped and centred so a wide embed never stretches a
+            one-line answer across the whole pane, and it is bottom-anchored so
+            a short conversation sits just above the composer instead of
+            stranding a void between the two. The spacer does the anchoring
+            rather than `justify-end`, which in a scroll container can put the
+            top of a long conversation out of reach. */}
+        <div className="mx-auto flex min-h-full w-full max-w-2xl flex-col gap-4 px-4 py-5 sm:px-5">
+          <div className="flex-1" aria-hidden />
+          {showIntro && (
+            <div className="animate-fade-up">
+              <Bubble theme={theme} accent={bot.accent} role="assistant" emoji={bot.avatarEmoji}>
+                <Markdown text={bot.greeting || `Hi! I'm ${bot.name}.`} />
+              </Bubble>
+              {bot.suggestions.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-2 pl-9">
+                  {bot.suggestions.map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => send(s)}
+                      className={`rounded-full border px-3 py-1.5 text-xs transition ${
+                        dark
+                          ? 'border-slate-700 text-slate-300 hover:bg-slate-800'
+                          : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
               )}
-            </Bubble>
-            {m.role === 'assistant' && m.content && m.citations?.length ? (
-              <Sources citations={m.citations} dark={dark} accent={bot.accent} />
-            ) : null}
-          </div>
-        ))}
+            </div>
+          )}
 
-        {error && (
-          <div
-            className={`rounded-xl border px-3 py-2 text-xs ${
-              dark ? 'border-red-900 bg-red-950 text-red-200' : 'border-red-200 bg-red-50 text-red-700'
-            }`}
-          >
-            {error}
-          </div>
-        )}
-      </div>
+          {messages.map((m, i) => (
+            <div key={i}>
+              <Bubble theme={theme} accent={bot.accent} role={m.role} emoji={bot.avatarEmoji}>
+                {m.content ? (
+                  <Markdown text={m.content} />
+                ) : (
+                  <span className="inline-flex gap-1 py-1" aria-label="Thinking">
+                    <Dot delay="0s" />
+                    <Dot delay=".2s" />
+                    <Dot delay=".4s" />
+                  </span>
+                )}
+              </Bubble>
+              {m.role === 'assistant' && m.content && m.citations?.length ? (
+                <Sources citations={m.citations} dark={dark} accent={bot.accent} />
+              ) : null}
+            </div>
+          ))}
 
-      <div className="relative border-t px-3 py-3" style={{ borderColor: theme.border }}>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            send(input);
-          }}
-          className={`flex items-end gap-2 rounded-2xl border px-3 py-2 transition focus-within:ring-4 ${theme.composer}`}
-        >
-          <textarea
-            ref={textareaRef}
-            rows={1}
-            value={input}
-            onChange={(e) => {
-              setInput(e.target.value);
-              const el = e.target;
-              el.style.height = 'auto';
-              el.style.height = `${Math.min(140, el.scrollHeight)}px`;
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                send(input);
-              }
-            }}
-            placeholder={bot.placeholder || 'Type a message…'}
-            className={`max-h-36 flex-1 resize-none bg-transparent py-1.5 text-sm outline-none ${
-              dark ? 'placeholder:text-slate-500' : 'placeholder:text-slate-400'
-            }`}
-          />
-          {streaming ? (
-            <button
-              type="button"
-              onClick={stop}
-              className={`shrink-0 rounded-xl px-3 py-2 text-xs font-medium ${
-                dark ? 'bg-slate-700 text-slate-200' : 'bg-slate-200 text-slate-700'
+          {error && (
+            <div
+              className={`rounded-xl border px-3 py-2 text-xs ${
+                dark ? 'border-red-900 bg-red-950 text-red-200' : 'border-red-200 bg-red-50 text-red-700'
               }`}
             >
-              Stop
-            </button>
-          ) : (
-            <button
-              type="submit"
-              disabled={!input.trim()}
-              className="shrink-0 rounded-xl px-3.5 py-2 text-sm font-medium transition disabled:opacity-40"
-              style={accessibleSurfaceStyle(bot.accent)}
-              aria-label="Send"
-            >
-              ↑
-            </button>
+              {error}
+            </div>
           )}
-        </form>
-        {showFooter && (
-          <p className={`mt-2 text-center text-[11px] ${dark ? 'text-slate-500' : 'text-slate-400'}`}>
-            AI can make mistakes, so double-check anything important.
-          </p>
-        )}
+        </div>
+      </div>
+
+      <div className="relative border-t px-4 py-3 sm:px-5" style={{ borderColor: theme.border }}>
+        <div className="mx-auto w-full max-w-2xl">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              send(input);
+            }}
+            className={`flex items-end gap-2 rounded-2xl border px-3 py-2 transition focus-within:ring-4 ${theme.composer}`}
+          >
+            <textarea
+              ref={textareaRef}
+              rows={1}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  send(input);
+                }
+              }}
+              placeholder={bot.placeholder || 'Type a message…'}
+              className={`thin-scroll max-h-36 flex-1 resize-none bg-transparent py-1.5 text-[15px] outline-none ${
+                dark ? 'placeholder:text-slate-500' : 'placeholder:text-slate-400'
+              }`}
+            />
+            {streaming ? (
+              <button
+                type="button"
+                onClick={stop}
+                className={`shrink-0 rounded-xl px-3 py-2 text-xs font-medium ${
+                  dark ? 'bg-slate-700 text-slate-200' : 'bg-slate-200 text-slate-700'
+                }`}
+              >
+                Stop
+              </button>
+            ) : (
+              <button
+                type="submit"
+                disabled={!input.trim()}
+                className="shrink-0 rounded-xl px-3.5 py-2 text-sm font-medium transition disabled:opacity-40"
+                style={accessibleSurfaceStyle(bot.accent)}
+                aria-label="Send"
+              >
+                ↑
+              </button>
+            )}
+          </form>
+          {showFooter && (
+            <p className={`mt-2 text-center text-[11px] ${dark ? 'text-slate-500' : 'text-slate-400'}`}>
+              AI can make mistakes, so double-check anything important.
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -585,8 +668,8 @@ function Bubble({
         </div>
       )}
       <div
-        className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${
-          isUser ? '' : theme.bubble
+        className={`max-w-[min(88%,34rem)] px-4 py-2.5 text-[15px] leading-relaxed ${
+          isUser ? 'rounded-2xl rounded-br-md' : `rounded-2xl rounded-tl-md ${theme.bubble}`
         }`}
         style={isUser ? accessibleSurfaceStyle(accent) : undefined}
       >

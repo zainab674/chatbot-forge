@@ -13,6 +13,49 @@ function store(name: string): any[] {
   return stores.get(name)!;
 }
 
+/**
+ * Fields carrying a unique index, per collection.
+ *
+ * Worth the handful of lines because a unique index here is not a performance
+ * hint — it is the rule the app leans on. `grantCredits` decides whether a
+ * Stripe payment has already been honoured purely from whether inserting its
+ * ledger row raises a duplicate key, so a test double that quietly accepts
+ * every insert would report that logic as working no matter what it did.
+ */
+const uniques = new Map<string, Set<string>>();
+
+function uniqueFields(name: string): Set<string> {
+  if (!uniques.has(name)) uniques.set(name, new Set());
+  return uniques.get(name)!;
+}
+
+/** Registers `{ key, options: { unique: true } }` specs from mongodb.ts. */
+export function registerIndexes(name: string, indexes: any[] = []): void {
+  for (const spec of indexes) {
+    if (!spec || !('key' in spec) || !spec.options?.unique) continue;
+    for (const field of Object.keys(spec.key)) uniqueFields(name).add(field);
+  }
+}
+
+class DuplicateKeyError extends Error {
+  code = 11000;
+  constructor(field: string) {
+    super(`E11000 duplicate key error collection: index: ${field}_1 dup key`);
+  }
+}
+
+/**
+ * Every unique index in this app is sparse in effect — a document without the
+ * field does not participate — so an absent value never collides.
+ */
+function assertUnique(name: string, doc: any): void {
+  for (const field of uniqueFields(name)) {
+    const value = doc?.[field];
+    if (value === undefined || value === null) continue;
+    if (store(name).some((d) => d[field] === value)) throw new DuplicateKeyError(field);
+  }
+}
+
 function matches(doc: any, filter: Record<string, any>): boolean {
   return Object.entries(filter).every(([k, v]) => {
     if (k === '$or') return (v as any[]).some((sub) => matches(doc, sub));
@@ -44,10 +87,12 @@ interface Update {
   $inc?: Record<string, number>;
   $setOnInsert?: Record<string, any>;
   $push?: Record<string, any>;
+  $unset?: Record<string, any>;
 }
 
 function apply(doc: Record<string, any>, update: Update) {
   if (update.$set) Object.assign(doc, update.$set);
+  if (update.$unset) for (const k of Object.keys(update.$unset)) delete doc[k];
   if (update.$inc) for (const [k, v] of Object.entries(update.$inc)) doc[k] = (doc[k] ?? 0) + v;
   if (update.$push) {
     for (const [k, v] of Object.entries(update.$push)) {
@@ -109,11 +154,15 @@ function fakeCollection(name: string) {
       return rows().filter((d) => matches(d, filter)).length;
     },
     async insertOne(doc: any) {
+      assertUnique(name, doc);
       rows().push({ ...doc });
       return { acknowledged: true };
     },
     async insertMany(docs: any[]) {
-      for (const d of docs) rows().push({ ...d });
+      for (const d of docs) {
+        assertUnique(name, d);
+        rows().push({ ...d });
+      }
       return { acknowledged: true, insertedCount: docs.length };
     },
     async updateOne(
@@ -180,7 +229,8 @@ function fakeCollection(name: string) {
   };
 }
 
-export async function collection(name: string): Promise<any> {
+export async function collection(name: string, indexes: any[] = []): Promise<any> {
+  registerIndexes(name, indexes);
   return fakeCollection(name);
 }
 

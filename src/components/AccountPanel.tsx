@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { getOwnerId } from '@/lib/owner';
 import { notifyAuthChanged } from '@/lib/auth-events';
 import { PACKS, formatPrice, type Pack } from '@/lib/packs';
+import { SIGNUP_CREDITS } from '@/lib/platform';
 
 interface Me {
   email: string;
@@ -288,6 +289,12 @@ export default function AccountPanel() {
           <button className="btn-primary mt-4" onClick={submit} disabled={busy || !email || !password}>
             {busy ? 'One moment…' : tab === 'login' ? 'Log in' : 'Create account'}
           </button>
+          {tab === 'signup' && (
+            <p className="mt-3 text-xs text-slate-500">
+              New accounts start with {SIGNUP_CREDITS} free credits — one credit is one message on our API
+              keys, so you can build a bot and talk to it before adding a key of your own.
+            </p>
+          )}
           {tab === 'login' && (
             <button
               type="button"
@@ -349,7 +356,7 @@ export default function AccountPanel() {
           <p className="mt-1 font-serif text-[34px] leading-none text-white">{me.credits}</p>
           <p className="mt-2.5 text-xs leading-relaxed text-slate-300">
             One credit = one message on our API keys, for bots saved without a key of their own (included models:
-            GPT-4o mini, Gemini Flash, Claude Haiku, Llama on Groq). Bots using your own keys never spend credits.
+            GPT-OSS on Groq, Gemini Flash, GPT-4o mini). Bots using your own keys never spend credits.
           </p>
         </div>
 
