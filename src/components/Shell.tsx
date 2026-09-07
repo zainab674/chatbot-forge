@@ -57,10 +57,10 @@ export default function Shell({
         <span className="mb-8 block h-px w-full bg-slate-200" aria-hidden />
         <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-end sm:justify-between">
           <div className="text-center sm:text-left">
-            <Link href="/" className="font-serif text-[15px] tracking-[0.14em] text-slate-900">
+            <Link href="/" className="inline-flex min-h-[24px] items-center font-serif text-[15px] tracking-[0.14em] text-slate-900">
               CHATBOT FORGE
             </Link>
-            <p className="mt-2 text-[11px] font-light uppercase tracking-label text-slate-600">
+            <p className="mt-2 text-[11px] font-light uppercase tracking-label text-slate-700">
               Bring your own model, your own key, your own prompt
             </p>
           </div>
@@ -69,7 +69,7 @@ export default function Shell({
               <Link
                 key={l.href}
                 href={l.href}
-                className="text-[11px] font-medium uppercase tracking-label text-slate-500 transition duration-200 ease-editorial hover:text-slate-900"
+                className="inline-flex min-h-[24px] items-center text-[11px] font-medium uppercase tracking-label text-slate-700 transition duration-200 ease-editorial hover:text-slate-900"
               >
                 {l.label}
               </Link>

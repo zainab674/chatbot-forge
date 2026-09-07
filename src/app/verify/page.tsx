@@ -3,7 +3,10 @@ import Shell from '@/components/Shell';
 import PageHeader from '@/components/PageHeader';
 import VerifyEmail from '@/components/VerifyEmail';
 
-export const metadata = { title: 'Confirm email | Chatbot Forge' };
+export const metadata = {
+  title: 'Confirm email | Chatbot Forge',
+  robots: { index: false, follow: false },
+};
 
 export default function VerifyPage() {
   return (

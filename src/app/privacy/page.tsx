@@ -2,7 +2,11 @@ import Shell from '@/components/Shell';
 import PageHeader from '@/components/PageHeader';
 import Link from 'next/link';
 
-export const metadata = { title: 'Privacy | Chatbot Forge' };
+export const metadata = {
+  title: 'Privacy | Chatbot Forge',
+  description:
+    'What Chatbot Forge stores, why it stores it, how long it keeps it, and how to get it back or have it deleted.',
+};
 
 /**
  * A starting point, not legal advice.

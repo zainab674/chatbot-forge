@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Chatbot Forge">
+  <!-- The header mark, redrawn as geometry rather than type: a favicon that
+       relies on a font renders differently on every platform, and at 16px a
+       serif F turns to mud anyway. -->
+  <rect width="64" height="64" rx="14" fill="#2A302C"/>
+  <g fill="#FBF6ED">
+    <rect x="23" y="17" width="7"  height="30" rx="1.5"/>
+    <rect x="23" y="17" width="19" height="7"  rx="1.5"/>
+    <rect x="23" y="29" width="14" height="6"  rx="1.5"/>
+  </g>
+</svg>

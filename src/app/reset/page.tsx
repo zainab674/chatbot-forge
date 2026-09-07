@@ -3,7 +3,10 @@ import Shell from '@/components/Shell';
 import PageHeader from '@/components/PageHeader';
 import ResetPassword from '@/components/ResetPassword';
 
-export const metadata = { title: 'Reset password | Chatbot Forge' };
+export const metadata = {
+  title: 'Reset password | Chatbot Forge',
+  robots: { index: false, follow: false },
+};
 
 export default function ResetPage() {
   return (

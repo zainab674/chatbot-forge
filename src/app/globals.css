@@ -177,8 +177,9 @@ body {
    ships an `overline` text-decoration utility: it is emitted after the
    components layer, so it won at equal specificity and drew a literal rule
    above every caption on the site. */
+/* ink-700 rather than ink-500: 11px is small text, so it owes 4.5:1. */
 .kicker {
-  @apply text-[11px] font-medium uppercase tracking-label text-slate-500;
+  @apply text-[11px] font-medium uppercase tracking-label text-slate-700;
 }
 
 /* The top of a page. Everything used to top out around 2x body, so no line
@@ -228,17 +229,23 @@ body {
 .rail-step {
   @apply flex flex-none items-center gap-2.5;
 }
+/* The steps still ahead are disabled controls, which WCAG 1.4.3 exempts from a
+   contrast minimum — and they need to stay lighter than the current step or the
+   rail stops telling you where you are. They are lifted to ink-600 anyway,
+   because "exempt" is not the same as "unreadable", and the done/now states
+   below carry the distinction on their own. */
 .rail-bub {
-  @apply grid h-8 w-8 flex-none place-items-center rounded-control border border-slate-300 bg-white font-serif text-[13px] text-slate-500 transition;
+  @apply grid h-8 w-8 flex-none place-items-center rounded-control border border-slate-300 bg-white font-serif text-[13px] text-slate-600 transition;
 }
 .rail-lbl {
-  @apply text-[11px] font-medium uppercase tracking-wide text-slate-500 transition;
+  @apply text-[11px] font-medium uppercase tracking-wide text-slate-600 transition;
 }
 .rail-step.is-done .rail-bub {
   @apply border-emerald-600 bg-emerald-50 text-emerald-700;
 }
+/* A completed step *is* clickable, so this one owes the full 4.5:1. */
 .rail-step.is-done .rail-lbl {
-  @apply text-slate-600;
+  @apply text-slate-700;
 }
 .rail-step.is-now .rail-bub {
   @apply border-slate-900 bg-slate-900 text-white;
@@ -312,8 +319,11 @@ body {
 }
 
 /* ---- pills & buttons ---- */
+/* `whitespace-nowrap` only once there is room for it. The draft-mode pill on
+   /create runs to 389px of unbreakable text, which is wider than a 375px phone
+   — it was pushing the whole page into a horizontal scroll. */
 .pill {
-  @apply inline-flex items-center gap-2 whitespace-nowrap rounded-control border border-slate-300 bg-transparent px-3.5 py-2 text-[10.5px] font-medium uppercase tracking-wide text-slate-700 transition duration-200 ease-editorial;
+  @apply inline-flex max-w-full items-center gap-2 whitespace-normal rounded-control border border-slate-300 bg-transparent px-3.5 py-2 text-[10.5px] font-medium uppercase tracking-wide text-slate-700 transition duration-200 ease-editorial sm:whitespace-nowrap;
 }
 .pill:hover {
   @apply -translate-y-px border-slate-900 text-slate-900 shadow-lift;
@@ -374,8 +384,10 @@ body {
    only chrome they get, so the masthead stays a masthead and the one dark
    button beside them keeps being the only thing that looks pressable. Without
    this the header gave no answer to "which page am I on". */
+/* ink-700, not ink-600. At 11px this is small text by WCAG's reckoning, so it
+   needs 4.5:1 against the cream header and ink-600 measured 3.71:1. */
 .navlink {
-  @apply relative whitespace-nowrap rounded-control px-3 py-2.5 text-[11px] font-medium uppercase tracking-label text-slate-600 transition duration-200 ease-editorial;
+  @apply relative whitespace-nowrap rounded-control px-3 py-2.5 text-[11px] font-medium uppercase tracking-label text-slate-700 transition duration-200 ease-editorial;
 }
 .navlink::after {
   content: '';
@@ -434,8 +446,11 @@ body {
 /* Every interior page opens the same way — where you came from, what this
    page is, what you can do on it — in that order and on the same measure, so
    moving between them does not feel like moving between products. */
+/* `min-h` earns its place: at 11px this link was a 17px-tall target, under the
+   24px WCAG 2.5.8 asks for. The height is added without padding so the crumb
+   still sits on the same baseline it always did. */
 .crumb {
-  @apply inline-flex items-center gap-2 text-[11px] font-medium uppercase tracking-label text-slate-500 transition duration-200 ease-editorial;
+  @apply inline-flex min-h-[24px] items-center gap-2 text-[11px] font-medium uppercase tracking-label text-slate-700 transition duration-200 ease-editorial;
 }
 .crumb:hover {
   @apply text-slate-900;
@@ -670,8 +685,9 @@ body {
 .bigbox-bar {
   @apply mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4;
 }
+/* ink-700: these are hints, but a hint you cannot read is not a hint. */
 .mini-tag {
-  @apply text-[10.5px] font-medium uppercase tracking-wide text-slate-500;
+  @apply text-[10.5px] font-medium uppercase tracking-wide text-slate-700;
 }
 .chip {
   @apply inline-flex items-center gap-2 rounded-control border border-slate-300 bg-transparent px-4 py-2.5 text-[10.5px] font-medium uppercase tracking-wide text-slate-700 transition duration-200 ease-editorial;
@@ -866,7 +882,7 @@ button.card:active {
   @apply h-[7px] w-[7px] rounded-full bg-slate-300;
 }
 .mock-url {
-  @apply ml-2 flex-1 truncate rounded-control bg-white px-3 py-1 text-center font-mono text-[10.5px] text-slate-500;
+  @apply ml-2 flex-1 truncate rounded-control bg-white px-3 py-1 text-center font-mono text-[10.5px] text-slate-700;
 }
 .mock-body {
   @apply flex flex-col gap-3 px-5 py-6;
@@ -902,8 +918,10 @@ button.card:active {
 .mock-foot {
   @apply flex items-center gap-2 border-t border-slate-200 px-4 py-3;
 }
+/* It depicts a placeholder, but it is real text on a real screen — a reader
+   with low vision does not get to know it is only a picture of an input. */
 .mock-input {
-  @apply flex-1 text-[12.5px] font-light text-slate-400;
+  @apply flex-1 text-[12.5px] font-light text-slate-600;
 }
 .mock-send {
   @apply grid h-7 w-7 place-items-center rounded-control bg-slate-900 text-[12px] text-white;
@@ -918,8 +936,12 @@ button.card:active {
 .numcard:hover {
   @apply -translate-y-1 shadow-lift-lg;
 }
+/* sand-500 rather than sand-300. At 44px this counts as large text, so it owes
+   3:1 and the pale original measured 1.62:1. This is the lightest step on the
+   ramp that clears it, so the numeral stays a secondary mark rather than
+   becoming a second headline. */
 .numcard-n {
-  @apply font-serif text-[44px] font-normal leading-none text-accent-300 transition duration-300 ease-editorial;
+  @apply font-serif text-[44px] font-normal leading-none text-accent-600 transition duration-300 ease-editorial;
 }
 .numcard:hover .numcard-n {
   @apply text-accent-500;

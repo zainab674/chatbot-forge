@@ -5,7 +5,10 @@ import BotForm from '@/components/BotForm';
 import { verifySessionToken, SESSION_COOKIE } from '@/lib/auth';
 import { ANON_TRIAL_MESSAGES } from '@/lib/platform';
 
-export const metadata = { title: 'New chatbot | Chatbot Forge' };
+export const metadata = {
+  title: 'New chatbot | Chatbot Forge',
+  robots: { index: false, follow: false },
+};
 export const dynamic = 'force-dynamic';
 
 export default function CreatePage() {

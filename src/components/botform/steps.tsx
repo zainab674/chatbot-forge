@@ -75,7 +75,7 @@ export function SparkStep({
         <button
           type="button"
           onClick={onSkip}
-          className="text-[10.5px] font-medium uppercase tracking-wide text-slate-500 underline decoration-slate-300 underline-offset-4 transition hover:text-accent-700 hover:decoration-accent-600"
+          className="inline-flex min-h-[24px] items-center text-[10.5px] font-medium uppercase tracking-wide text-slate-700 underline decoration-slate-300 underline-offset-4 transition hover:text-accent-700 hover:decoration-accent-600"
         >
           Skip — start from blank →
         </button>

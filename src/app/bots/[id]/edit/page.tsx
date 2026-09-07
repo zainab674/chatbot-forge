@@ -1,7 +1,10 @@
 import Shell from '@/components/Shell';
 import EditBot from '@/components/EditBot';
 
-export const metadata = { title: 'Edit chatbot — Chatbot Forge' };
+export const metadata = {
+  title: 'Edit chatbot — Chatbot Forge',
+  robots: { index: false, follow: false },
+};
 
 export default function EditPage({ params }: { params: { id: string } }) {
   return (

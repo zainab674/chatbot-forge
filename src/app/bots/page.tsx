@@ -3,7 +3,10 @@ import Shell from '@/components/Shell';
 import PageHeader from '@/components/PageHeader';
 import BotList from '@/components/BotList';
 
-export const metadata = { title: 'My bots | Chatbot Forge' };
+export const metadata = {
+  title: 'My bots | Chatbot Forge',
+  robots: { index: false, follow: false },
+};
 
 /** The dashboard. The homepage sells the product; this page manages what you built. */
 export default function BotsPage() {

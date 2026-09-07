@@ -298,7 +298,7 @@ export default function AccountPanel() {
           {tab === 'login' && (
             <button
               type="button"
-              className="mt-3 text-xs text-slate-500 underline underline-offset-2 hover:text-slate-800"
+              className="mt-3 inline-flex min-h-[24px] items-center text-xs text-slate-700 underline underline-offset-2 hover:text-slate-900"
               onClick={() => {
                 setForgot(true);
                 setError(null);

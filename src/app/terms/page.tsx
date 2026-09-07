@@ -2,7 +2,11 @@ import Shell from '@/components/Shell';
 import PageHeader from '@/components/PageHeader';
 import Link from 'next/link';
 
-export const metadata = { title: 'Terms | Chatbot Forge' };
+export const metadata = {
+  title: 'Terms | Chatbot Forge',
+  description:
+    'The terms for using Chatbot Forge: what the service does, what it costs, and what each side is responsible for.',
+};
 
 /** Same caveat as /privacy: accurate about the software, not a substitute for a lawyer. */
 const OPERATOR = process.env.NEXT_PUBLIC_OPERATOR_NAME || '[your company name]';

@@ -6,7 +6,10 @@ import AdminPanel from '@/components/AdminPanel';
 import { users } from '@/lib/mongodb';
 import { isAdmin, sessionRevoked, verifySession, SESSION_COOKIE } from '@/lib/auth';
 
-export const metadata = { title: 'Admin | Chatbot Forge' };
+export const metadata = {
+  title: 'Admin | Chatbot Forge',
+  robots: { index: false, follow: false },
+};
 export const dynamic = 'force-dynamic';
 
 /**

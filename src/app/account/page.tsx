@@ -2,7 +2,10 @@ import Shell from '@/components/Shell';
 import PageHeader from '@/components/PageHeader';
 import AccountPanel from '@/components/AccountPanel';
 
-export const metadata = { title: 'Account | Chatbot Forge' };
+export const metadata = {
+  title: 'Account | Chatbot Forge',
+  robots: { index: false, follow: false },
+};
 
 export default function AccountPage() {
   return (
