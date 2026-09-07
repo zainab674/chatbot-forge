@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { users, bots, bookings } from '@/lib/mongodb';
 import { requireAdmin } from '@/lib/admin';
-import { isAdminEmail } from '@/lib/auth';
+import { isAdminEmail, rootAdminEmail } from '@/lib/auth';
 import { serverError } from '@/lib/http';
 
 export const runtime = 'nodejs';
@@ -20,7 +20,22 @@ export async function GET(req: NextRequest) {
     const botsCol = await bots();
     const bookingsCol = await bookings();
 
-    const [userList, botList, bookingCount] = await Promise.all([
+    /* The lists below are capped at 500 rows because that is a table someone
+       has to read. The *stats* must not be capped with them: reading
+       `userList.length` meant the dashboard reported exactly 500 users forever
+       once the platform passed 500, and quietly stopped counting the credits
+       and admins beyond that page too — while the booking figure, which used
+       countDocuments, kept climbing. One number growing beside three frozen
+       ones is worse than no number at all.
+
+       The two sums go through `$group`, so they stay O(1) over the wire however
+       many accounts and bots exist. The test store grew just enough pipeline
+       support to answer them the same way. */
+    const root = rootAdminEmail();
+    const adminFilter = root ? { $or: [{ role: 'admin' }, { email: root }] } : { role: 'admin' };
+
+    const [userList, botList, bookingCount, userCount, botCount, adminCount, creditAgg, messageAgg] =
+      await Promise.all([
       usersCol
         .find({}, { projection: { _id: 0, passwordHash: 0 } })
         .sort({ createdAt: -1 })
@@ -48,24 +63,27 @@ export async function GET(req: NextRequest) {
         .limit(500)
         .toArray(),
       bookingsCol.countDocuments({}),
+      usersCol.countDocuments({}),
+      botsCol.countDocuments({}),
+      usersCol.countDocuments(adminFilter as any),
+      (usersCol as any).aggregate([{ $group: { _id: null, total: { $sum: '$credits' } } }]).toArray(),
+      (botsCol as any).aggregate([{ $group: { _id: null, total: { $sum: '$messageCount' } } }]).toArray(),
     ]);
 
     const emailByOwner = new Map(userList.map((u) => [u.id, u.email]));
     const botsByOwner = new Map<string, number>();
-    let totalMessages = 0;
     for (const b of botList) {
       botsByOwner.set(b.ownerId, (botsByOwner.get(b.ownerId) ?? 0) + 1);
-      totalMessages += b.messageCount ?? 0;
     }
 
     return NextResponse.json({
       stats: {
-        users: userList.length,
-        bots: botList.length,
-        messages: totalMessages,
+        users: userCount,
+        bots: botCount,
+        messages: messageAgg[0]?.total ?? 0,
         bookings: bookingCount,
-        creditsOutstanding: userList.reduce((s, u) => s + (u.credits ?? 0), 0),
-        admins: userList.filter((u) => u.role === 'admin' || isAdminEmail(u.email)).length,
+        creditsOutstanding: creditAgg[0]?.total ?? 0,
+        admins: adminCount,
       },
       users: userList.map((u) => ({
         email: u.email,

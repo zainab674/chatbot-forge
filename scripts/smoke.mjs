@@ -694,6 +694,19 @@ async function main() {
     const beforePromotion = await fetch(`${BASE}/api/admin/overview`, { headers: plainHeaders });
     check('a plain user gets 404 from the admin API', beforePromotion.status === 404);
 
+    /* The /admin *page* has to answer the same way as the API behind it. It
+       used to check only that some valid session existed, so any signed-in
+       visitor could open it and read the heading — which gives away exactly
+       what the API's 404 is there to hide. */
+    const pageAsPlain = await fetch(`${BASE}/admin`, { headers: { cookie: plainSession } });
+    check('a plain user gets 404 from the admin page', pageAsPlain.status === 404);
+
+    const pageAsAnon = await fetch(`${BASE}/admin`);
+    check('a signed-out visitor gets 404 from the admin page', pageAsAnon.status === 404);
+
+    const pageAsRoot = await fetch(`${BASE}/admin`, { headers: { cookie: session } });
+    check('the root admin can still open the admin page', pageAsRoot.ok);
+
     const setRole = (headers, email, role) =>
       fetch(`${BASE}/api/admin/users`, { method: 'PATCH', headers, body: JSON.stringify({ email, role }) });
 

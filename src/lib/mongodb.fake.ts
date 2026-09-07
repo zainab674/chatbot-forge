@@ -222,9 +222,40 @@ function fakeCollection(name: string) {
       }
       return { deletedCount: n };
     },
-    /** Atlas-only in production; the fake never advertises it, so callers fall back. */
-    aggregate() {
-      throw new Error('aggregate is not supported by the test store');
+    /**
+     * Just enough of a pipeline for the admin dashboard's totals: an optional
+     * `$match`, then a `$group` on a null key summing one field.
+     *
+     * Everything else still throws, and that is load-bearing rather than lazy —
+     * retrieval calls `aggregate` with `$vectorSearch`, which is an Atlas
+     * feature the tests must fall through to in-process scoring for. Answering
+     * that pipeline with a plausible empty result would stop the fallback path
+     * from ever being exercised.
+     */
+    aggregate(pipeline: any[] = []) {
+      const stages = pipeline.filter(Boolean);
+      const match = stages.find((s) => '$match' in s)?.$match ?? {};
+      const group = stages.find((s) => '$group' in s)?.$group;
+      const unsupported = stages.some((s) => !('$match' in s) && !('$group' in s));
+      if (!group || unsupported || group._id !== null) {
+        throw new Error('aggregate pipeline is not supported by the test store');
+      }
+
+      const picked = rows().filter((d) => matches(d, match));
+      const out: Record<string, any> = { _id: null };
+      for (const [field, spec] of Object.entries(group)) {
+        if (field === '_id') continue;
+        const sum = (spec as any)?.$sum;
+        const isFieldRef = typeof sum === 'string' && sum.charAt(0) === '$';
+        if (!isFieldRef) throw new Error('only { $sum: "$field" } is supported by the test store');
+        const key = sum.slice(1);
+        out[field] = picked.reduce((n, d) => n + (Number(d[key]) || 0), 0);
+      }
+      return {
+        async toArray() {
+          return [out];
+        },
+      };
     },
   };
 }

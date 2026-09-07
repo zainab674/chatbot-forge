@@ -217,8 +217,20 @@ export const LOGIN_REQUIRED = 'Log in to manage your chatbots.';
 export const SIGNUP_FOR_KEYS =
   'Create a free account to save an API key — keys are encrypted and stored only on accounts, never on anonymous drafts.';
 
+/**
+ * The root admin's address, normalised — or null when none is configured.
+ *
+ * Exported because callers that need to *query* for the root admin (rather than
+ * test one address against it) were otherwise re-implementing the trim and
+ * lowercase by hand, and a second copy of that is a second chance to get it
+ * subtly different.
+ */
+export function rootAdminEmail(): string | null {
+  return process.env.ADMIN_EMAIL?.trim().toLowerCase() || null;
+}
+
 export function isAdminEmail(email: string | undefined | null): boolean {
-  const admin = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+  const admin = rootAdminEmail();
   return Boolean(admin && email && email.trim().toLowerCase() === admin);
 }
 

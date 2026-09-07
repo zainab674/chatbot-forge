@@ -5,6 +5,31 @@ import Link from 'next/link';
 
 type Role = 'user' | 'admin';
 
+/**
+ * Two-step arming for an action that cannot be taken back from this screen.
+ *
+ * The first click arms, the second commits, and it disarms itself after a few
+ * seconds so a stray arm is not left sitting there waiting for the next click
+ * that lands near it.
+ *
+ * Deliberately not `window.confirm`: that blocks the whole tab, cannot be
+ * styled to say which key or which account is about to go, and is invisible to
+ * the Playwright checks unless every one of them installs a dialog handler.
+ *
+ * Note what is *not* armed — pausing a bot. That is the abuse lever, it wants
+ * to be one click under pressure, and it is trivially reversible by clicking
+ * again. Confirmation is for the things you cannot undo here.
+ */
+function useArmed(ms = 4000) {
+  const [armed, setArmed] = useState(false);
+  useEffect(() => {
+    if (!armed) return;
+    const t = setTimeout(() => setArmed(false), ms);
+    return () => clearTimeout(t);
+  }, [armed, ms]);
+  return { armed, arm: () => setArmed(true), disarm: () => setArmed(false) };
+}
+
 interface Overview {
   stats: {
     users: number;
@@ -180,8 +205,13 @@ function UserRow({ user }: { user: Overview['users'][number] }) {
 
   const locked = user.isSelf || user.isRoot;
   const next: Role = role === 'admin' ? 'user' : 'admin';
+  const { armed, arm, disarm } = useArmed();
 
   async function toggle() {
+    // Handing someone the admin panel — or taking it away — on a single stray
+    // click is not a thing this table should allow.
+    if (!armed) return arm();
+    disarm();
     setBusy(true);
     setError(null);
     try {
@@ -222,10 +252,12 @@ function UserRow({ user }: { user: Overview['users'][number] }) {
               ? 'The root admin is set by ADMIN_EMAIL and cannot be changed here.'
               : user.isSelf
                 ? 'You cannot change your own role.'
-                : `Make this account ${next === 'admin' ? 'an admin' : 'a regular user'}`
+                : armed
+                  ? `Click again to confirm: make this account ${next === 'admin' ? 'an admin' : 'a regular user'}`
+                  : `Make this account ${next === 'admin' ? 'an admin' : 'a regular user'}`
           }
         >
-          {busy ? '…' : role}
+          {busy ? '…' : armed ? `make ${next}?` : role}
         </button>
       </td>
       <td className="py-2 pr-4 tabular-nums">{user.credits}</td>
@@ -238,17 +270,34 @@ function UserRow({ user }: { user: Overview['users'][number] }) {
 function BotRow({ bot }: { bot: Overview['bots'][number] }) {
   const [isPublic, setIsPublic] = useState(bot.isPublic);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
+  /**
+   * The failure path matters more here than anywhere else on this screen.
+   *
+   * This used to swallow the error and simply not move the toggle, which is the
+   * worst possible behaviour for the one control an admin reaches for when a
+   * bot is burning platform credits: it looks like nothing happened, and the
+   * bot is still live. Now a failure says so and the state is left alone.
+   */
   async function toggle() {
     setBusy(true);
+    setError(null);
     const next = !isPublic;
-    const res = await fetch(`/api/admin/bots/${bot.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ isPublic: next }),
-    }).catch(() => null);
-    if (res?.ok) setIsPublic(next);
-    setBusy(false);
+    try {
+      const res = await fetch(`/api/admin/bots/${bot.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isPublic: next }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(json?.error ?? `Could not ${next ? 'resume' : 'pause'} this bot.`);
+      setIsPublic(next);
+    } catch (e: any) {
+      setError(e?.message ?? 'Could not reach the server.');
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -277,6 +326,7 @@ function BotRow({ bot }: { bot: Overview['bots'][number] }) {
         >
           {busy ? '…' : isPublic ? 'live' : 'paused'}
         </button>
+        {error && <p className="mt-1 max-w-[160px] text-[11px] leading-tight text-red-700">{error}</p>}
       </td>
     </tr>
   );
@@ -346,6 +396,7 @@ function PlatformKeyRowForm({ row, onDone }: { row: PlatformKeyRow; onDone: () =
   const [value, setValue] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { armed: armedRemove, arm: armRemove, disarm: disarmRemove } = useArmed();
 
   async function save() {
     setBusy(true);
@@ -368,6 +419,10 @@ function PlatformKeyRowForm({ row, onDone }: { row: PlatformKeyRow; onDone: () =
   }
 
   async function remove() {
+    // Removing this stops every bot running on platform credits for this
+    // provider, and the anonymous trial with them. Worth a second click.
+    if (!armedRemove) return armRemove();
+    disarmRemove();
     setBusy(true);
     setError(null);
     try {
@@ -426,8 +481,17 @@ function PlatformKeyRowForm({ row, onDone }: { row: PlatformKeyRow; onDone: () =
           {busy ? '…' : row.mask ? 'Replace' : 'Save'}
         </button>
         {row.mask && (
-          <button className="btn-danger shrink-0 !px-5 !py-2" onClick={remove} disabled={busy}>
-            Remove
+          <button
+            className="btn-danger shrink-0 !px-5 !py-2"
+            onClick={remove}
+            disabled={busy}
+            title={
+              armedRemove
+                ? `Click again to remove the ${row.label} key`
+                : `Remove the ${row.label} key — every bot on platform credits for this provider stops`
+            }
+          >
+            {armedRemove ? 'Really remove?' : 'Remove'}
           </button>
         )}
       </div>
