@@ -932,8 +932,22 @@ function billingTests() {
     ),
   );
   check(
-    'the mailer is off until both settings are present',
-    withEnv({ RESEND_API_KEY: 'x', MAIL_FROM: undefined }, () => !mailConfigured()),
+    'the mailer is off with a host but no from address',
+    withEnv({ SMTP_HOST: 'smtp.example.test', MAIL_FROM: undefined }, () => !mailConfigured()),
+  );
+  check(
+    'the mailer is off with a from address but no host',
+    withEnv({ SMTP_HOST: undefined, MAIL_FROM: 'Forge <hi@example.test>' }, () => !mailConfigured()),
+  );
+  check(
+    'the mailer is on once both are set',
+    withEnv({ SMTP_HOST: 'smtp.example.test', MAIL_FROM: 'Forge <hi@example.test>' }, () => mailConfigured()),
+  );
+  // Whitespace is not configuration. A variable set to " " in a dashboard is
+  // the same mistake as leaving it unset, and should fail the same way.
+  check(
+    'blank settings do not count as configured',
+    withEnv({ SMTP_HOST: '   ', MAIL_FROM: 'Forge <hi@example.test>' }, () => !mailConfigured()),
   );
 
   group('Credit packs');

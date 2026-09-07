@@ -133,9 +133,14 @@ data are involved.
 
 ### 1. Set the mailer, or nobody can recover an account
 
-`RESEND_API_KEY` and `MAIL_FROM`. Without them, password-reset links are written to the function log
-instead of being sent, and a customer who forgets their password has no way back in except you
-editing the database. Booking notifications and purchase receipts go quiet too.
+`SMTP_HOST` and `MAIL_FROM`, plus `SMTP_USER` and `SMTP_PASS` if the server authenticates. Without
+them, password-reset links are written to the function log instead of being sent, and a customer who
+forgets their password has no way back in except you editing the database. Booking notifications and
+purchase receipts go quiet too.
+
+Netlify Functions run on Lambda, which blocks outbound port 25 — use 587 (the default here) or 465.
+If you are sending through Gmail, `SMTP_PASS` must be an app password; Google refuses a normal
+account password over SMTP.
 
 Check it by using **Forgot your password?** on /account and confirming the mail arrives.
 

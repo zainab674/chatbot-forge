@@ -24,6 +24,20 @@
         "C:/Users/PMYLS/AppData/Local/Temp/claude/C--Users-PMYLS-Desktop-chatbot-forge/1be9fe88-0547-4a39-85e3-2f36b1bad7ad/scratchpad"
       ],
       "port": 4321
+    },
+    {
+      "name": "portfolio dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "C:/Users/PMYLS/Desktop/portfolio",
+        "run",
+        "dev",
+        "--",
+        "-p",
+        "3400"
+      ],
+      "port": 3400
     }
   ]
 }

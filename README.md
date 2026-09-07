@@ -337,7 +337,8 @@ The short version:
 
 1. Set `NEXT_PUBLIC_APP_URL`. Emailed links and Stripe return URLs refuse to fall back to the
    request's `Host` header in production, so without it password resets do not send.
-2. Set `RESEND_API_KEY` and `MAIL_FROM`, or nobody can recover a forgotten password.
+2. Set `SMTP_HOST` and `MAIL_FROM` (plus `SMTP_USER` / `SMTP_PASS` if your server authenticates),
+   or nobody can recover a forgotten password.
 3. Check the unique index on `users.email` actually built — it silently fails if the collection
    already holds duplicate addresses. The query is in DEPLOY.md.
 4. Configure the Stripe webhook, or leave Stripe unset and keep top-ups manual through `/admin`.
