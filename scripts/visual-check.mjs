@@ -249,7 +249,7 @@ async function main() {
     check('all six steps are listed', (await page.locator('nav[aria-label="Builder steps"] .rail-step').count()) === 6);
     check('a starting point is offered', await page.getByText('Shop support').first().isVisible());
 
-    await page.getByText('Skip — start from blank').click();
+    await page.getByText('Skip and start from blank').click();
     check('skipping reaches the identity step', await page.getByText('Give it a face.').isVisible());
     await page.getByPlaceholder('Wax Assistant').fill('Demo Bot');
     check('typing a name updates the preview', await page.getByText('Demo Bot').first().isVisible());

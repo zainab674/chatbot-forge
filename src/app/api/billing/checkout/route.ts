@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
     // account that is not theirs.
     if (!user.emailVerifiedAt) {
       return NextResponse.json(
-        { error: 'Confirm your email address first — the receipt and any refund go there.' },
+        { error: 'Confirm your email address first: the receipt and any refund go there.' },
         { status: 403 },
       );
     }

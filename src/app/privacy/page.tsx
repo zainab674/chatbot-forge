@@ -53,7 +53,7 @@ export default function PrivacyPage() {
               credit balance, and when the account was created.
             </li>
             <li>
-              <strong>Your chatbots:</strong> everything you configure — name, instructions, knowledge base contents,
+              <strong>Your chatbots:</strong> everything you configure: name, instructions, knowledge base contents,
               and the files or pages you add to it.
             </li>
             <li>
@@ -74,7 +74,7 @@ export default function PrivacyPage() {
             automatically on the retention period you set.
           </p>
           <p>
-            Booking requests hold whatever the visitor typed — usually a name and an email address or phone number.
+            Booking requests hold whatever the visitor typed, usually a name and an email address or phone number.
             They are kept for {RETENTION_DAYS} days and then deleted automatically.
           </p>
           <p>

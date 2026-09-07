@@ -7,7 +7,7 @@ import LandingHero from '@/components/landing/LandingHero';
 import Pillars, { type Pillar } from '@/components/landing/Pillars';
 import ShipBand from '@/components/landing/ShipBand';
 import TrustRow from '@/components/landing/TrustRow';
-import { Reveal, ScrollProgress } from '@/components/motion/primitives';
+import { ScrollProgress } from '@/components/motion/primitives';
 
 /** Same fallback ManageBot uses, so the snippet on the landing page and the
  *  snippet on the ship screen are never two different shapes. */
@@ -24,7 +24,7 @@ const WIDGET_SNIPPET = `<script
 const PROVIDERS = ['Groq', 'OpenAI', 'Google Gemini'];
 
 const PILLARS: readonly Pillar[] = [
-  ['01', 'Any model', 'Groq, OpenAI, or Gemini — bring your own key, or run on credits.'],
+  ['01', 'Any model', 'Groq, OpenAI, or Gemini. Bring your own key, or run on credits.'],
   ['02', 'Your prompt, your voice', 'Paste your FAQs and rules, then pick a talking style or write your own.'],
   ['03', 'Three ways to ship', 'A shareable link, an <iframe> snippet, or a one-line widget script.'],
 ];
@@ -93,9 +93,7 @@ export default function HomePage() {
             the cream bot list below so the eye gets a change of ground. */}
         <ShipBand snippet={WIDGET_SNIPPET} />
 
-        <Reveal amount={0.15}>
-          <BotList preview />
-        </Reveal>
+        <BotList preview />
 
         <ClosingBand />
       </Shell>

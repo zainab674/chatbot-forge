@@ -89,7 +89,7 @@ export default function KeyRequest({
       <Strip tone="wait">
         <p>
           <strong className="font-semibold">Waiting on the admin.</strong> You asked about {current.providerLabel} on{' '}
-          {new Date(current.createdAt).toLocaleDateString()}. Nothing changes until they answer — until then this bot
+          {new Date(current.createdAt).toLocaleDateString()}. Nothing changes until they answer; until then this bot
           still needs a key of its own or credits on your account to reply.
         </p>
       </Strip>

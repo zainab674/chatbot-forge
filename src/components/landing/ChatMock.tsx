@@ -19,7 +19,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { motion, useInView, useMotionValue, useSpring, useTransform } from 'framer-motion';
+import { motion, useInView } from 'framer-motion';
 import { EASE, useLessMotion } from '@/components/motion/primitives';
 
 /**
@@ -84,14 +84,6 @@ export default function ChatMock() {
     };
   }, [inView, reduce]);
 
-  /* A card that tilts a couple of degrees toward the cursor. Enough to say the
-     surface is a screen sitting in space, not enough to make the type inside
-     it hard to read. */
-  const mx = useMotionValue(0);
-  const my = useMotionValue(0);
-  const spring = { stiffness: 130, damping: 18, mass: 0.5 };
-  const rotateX = useSpring(useTransform(my, [-0.5, 0.5], [6, -6]), spring);
-  const rotateY = useSpring(useTransform(mx, [-0.5, 0.5], [-8, 8]), spring);
 
   const shown = (n: number) => step >= n;
   /* The dots show while an answer is being composed — between the question
@@ -105,30 +97,14 @@ export default function ChatMock() {
   };
 
   return (
-    <motion.div
-      ref={ref}
-      aria-hidden
-      className="relative z-20 mx-auto -mt-16 mb-16 max-w-[560px] sm:-mt-24"
-      style={{ perspective: 1200 }}
-      initial={reduce ? false : { opacity: 0, y: 60, rotateX: 12, scale: 0.94 }}
-      whileInView={{ opacity: 1, y: 0, rotateX: 0, scale: 1 }}
-      viewport={{ once: true, amount: 0.3 }}
-      transition={{ duration: 1, ease: EASE }}
-      onPointerMove={(e) => {
-        if (reduce || e.pointerType !== 'mouse') return;
-        const box = e.currentTarget.getBoundingClientRect();
-        mx.set((e.clientX - box.left) / box.width - 0.5);
-        my.set((e.clientY - box.top) / box.height - 0.5);
-      }}
-      onPointerLeave={() => {
-        mx.set(0);
-        my.set(0);
-      }}
-    >
-      <motion.div
-        className="mock"
-        style={reduce ? undefined : { rotateX, rotateY, transformStyle: 'preserve-3d' }}
-      >
+    /* No tilt, no 3D arrival. The card used to lean a few degrees toward the
+       cursor and swing up out of a rotateX on scroll — a cursor-tracked 3D
+       card is the same trick as the cursor-tracked glow, and this one was
+       doing it to the single element on the page whose whole job is to be read.
+       What still moves is inside: the conversation types itself, because that
+       is the product rather than a decoration of it. */
+    <div ref={ref} aria-hidden className="relative z-20 mx-auto -mt-16 mb-16 max-w-[560px] sm:-mt-24">
+      <div className="mock">
         <div className="mock-bar">
           <span className="mock-dot" />
           <span className="mock-dot" />
@@ -152,7 +128,7 @@ export default function ChatMock() {
             <span className="mock-av">🕯️</span>
             <div>
               <p className="mock-bot">
-                We do — 3–5 business days, and shipping is free over $50. Returns stay open for 30 days.
+                We do. Delivery is 3–5 business days, and shipping is free over $50. Returns stay open for 30 days.
               </p>
               {/* The citation is the one detail that says this answer came out
                   of the shop's own file rather than out of the model, so it
@@ -211,7 +187,7 @@ export default function ChatMock() {
             ↑
           </motion.span>
         </div>
-      </motion.div>
-    </motion.div>
+      </div>
+    </div>
   );
 }

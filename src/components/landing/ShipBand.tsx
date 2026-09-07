@@ -18,7 +18,7 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { motion, useInView } from 'framer-motion';
-import { EASE, Magnetic, Parallax, Reveal, WordReveal, useLessMotion } from '@/components/motion/primitives';
+import { useLessMotion } from '@/components/motion/primitives';
 
 /** Characters per tick. Two is a typist, one is a teletype, and at this length
  *  a teletype outstays its welcome before the band has finished scrolling in. */
@@ -51,52 +51,29 @@ export default function ShipBand({ snippet }: { snippet: string }) {
   return (
     <section className="band tone-ink mb-20 grid items-center gap-10 lg:grid-cols-2 lg:gap-14">
       <div>
+        {/* Static. The kicker, the rule, the heading, the lede and the button
+            each used to animate themselves into place on scroll, which is five
+            separate arrivals for one paragraph of copy. The typing in the code
+            block below is the only thing in this band that is actually showing
+            you something, so it is the only thing left that moves. */}
         <div className="section-head">
-          <Reveal as="span" className="kicker" y={12} duration={0.6}>
-            Shipping
-          </Reveal>
-          {/* The bronze rule draws itself across rather than fading in — the
-              same gesture the hero's eyebrow makes, so the page has one idea
-              about what a rule does. */}
-          <motion.span
-            className="section-rule origin-left"
-            aria-hidden
-            initial={reduce ? undefined : { scaleX: 0 }}
-            whileInView={{ scaleX: 1 }}
-            viewport={{ once: true, amount: 0.6 }}
-            transition={{ duration: 0.7, delay: 0.1, ease: EASE }}
-          />
-          <h2 className="display-sm">
-            <WordReveal
-              delay={0.15}
-              segments={[{ text: 'One line on your site, and it is live.' }]}
-            />
-          </h2>
+          <span className="kicker">Shipping</span>
+          <span className="section-rule" aria-hidden />
+          <h2 className="display-sm">One line on your site, and it is live.</h2>
         </div>
-        <Reveal as="p" className="lede" delay={0.25} blur>
+        <p className="lede">
           Paste the script tag anywhere in your HTML. The bubble sits in the corner, loads on demand, and follows the
           colours you picked in the builder. Prefer no script at all? Take the hosted link or the iframe instead.
-        </Reveal>
-        <Reveal delay={0.35} className="mt-8">
-          <Magnetic>
-            <Link href="/create" className="btn-primary">
-              Start building
-            </Link>
-          </Magnetic>
-        </Reveal>
+        </p>
+        <div className="mt-8">
+          <Link href="/create" className="btn-primary">
+            Start building
+          </Link>
+        </div>
       </div>
 
-      {/* The code drifts against the scroll, which is what stops a two-column
-          band from arriving as one flat slab. */}
-      <Parallax distance={26}>
-        <motion.div
-          ref={codeRef}
-          className="codeblk shadow-lift-md"
-          initial={reduce ? undefined : { opacity: 0, y: 30 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, amount: 0.3 }}
-          transition={{ duration: 0.8, ease: EASE }}
-        >
+      <div>
+        <div ref={codeRef} className="codeblk shadow-lift-md">
           <div className="grid">
             {/* The spacer. It carries the real, complete snippet for anyone
                 copying it or reading with JavaScript off — see the noscript
@@ -116,8 +93,8 @@ export default function ShipBand({ snippet }: { snippet: string }) {
               )}
             </pre>
           </div>
-        </motion.div>
-      </Parallax>
+        </div>
+      </div>
     </section>
   );
 }

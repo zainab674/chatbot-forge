@@ -161,7 +161,7 @@ export function QAPairEditor({
           + Add a pinned answer
         </button>
       )}
-      <p className="hint">Shown to the model word for word — no indexing, no retrieval involved.</p>
+      <p className="hint">Shown to the model word for word. No indexing, no retrieval involved.</p>
     </div>
   );
 }

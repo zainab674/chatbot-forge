@@ -56,7 +56,7 @@ function keyDenial(reason: DenyReason | undefined, model: string): string {
     case 'no-platform-key':
       return 'The platform has no key stored for this provider yet. Paste your own API key in the Model section, or pick a provider the platform has a key for.';
     default:
-      return 'Enter your API key in the Model section first — or pick a model covered by platform credits (GPT-OSS on Groq, Gemini Flash, GPT-4o mini).';
+      return 'Enter your API key in the Model section first, or pick a model covered by platform credits (GPT-OSS on Groq, Gemini Flash, GPT-4o mini).';
   }
 }
 

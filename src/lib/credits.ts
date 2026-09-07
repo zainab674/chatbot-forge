@@ -386,7 +386,7 @@ export async function trialGrant(
 export function denialMessage(reason: DenyReason | undefined): string {
   switch (reason) {
     case 'trial-exhausted':
-      return `This draft chatbot has used its ${ANON_TRIAL_MESSAGES} free trial messages. Its owner can sign up (free) and add an API key — or credits — to keep it running.`;
+      return `This draft chatbot has used its ${ANON_TRIAL_MESSAGES} free trial messages. Its owner can sign up (free) and add an API key, or credits, to keep it running.`;
     case 'trial-ip-exhausted':
       return 'The free trial limit for this network has been reached for today. Create a free account to keep going.';
     case 'no-credits':

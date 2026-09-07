@@ -385,7 +385,7 @@ function PlatformKeys() {
         </div>
       )}
       <p className="hint mt-3">
-        Removing a key does not touch bots that carry their own — it only stops the credits tier and the free trial for
+        Removing a key does not touch bots that carry their own; it only stops the credits tier and the free trial for
         that provider.
       </p>
     </section>
@@ -488,7 +488,7 @@ function PlatformKeyRowForm({ row, onDone }: { row: PlatformKeyRow; onDone: () =
             title={
               armedRemove
                 ? `Click again to remove the ${row.label} key`
-                : `Remove the ${row.label} key — every bot on platform credits for this provider stops`
+                : `Remove the ${row.label} key. Every bot on platform credits for this provider stops`
             }
           >
             {armedRemove ? 'Really remove?' : 'Remove'}
@@ -634,7 +634,7 @@ function KeyRequests() {
         )}
       </div>
       <p className="hint">
-        Creators with no key of their own asking you to cover them. Approving records your decision — it does not hand
+        Creators with no key of their own asking you to cover them. Approving records your decision; it does not hand
         out anything. Set the key under &ldquo;Platform keys&rdquo; or top the account up under &ldquo;Grant
         credits&rdquo;, then mark the request here.
       </p>
@@ -643,7 +643,7 @@ function KeyRequests() {
       {!rows && !error && <div className="mt-4 h-24 animate-pulse rounded-control bg-slate-100" />}
       {rows && rows.length === 0 && <p className="mt-3 text-sm text-slate-600">Nobody has asked for a key yet.</p>}
       {rows && rows.length > 0 && visible.length === 0 && (
-        <p className="mt-3 text-sm text-slate-600">Nothing waiting — every request has been answered.</p>
+        <p className="mt-3 text-sm text-slate-600">Nothing waiting. Every request has been answered.</p>
       )}
 
       {visible.length > 0 && (
@@ -733,7 +733,7 @@ function KeyRequestCard({ row, onDone }: { row: KeyRequestRow; onDone: () => voi
           {row.status === 'approved' ? 'Approved' : 'Declined'}
           {row.decidedBy && ` by ${row.decidedBy}`}
           {row.decidedAt && ` on ${new Date(row.decidedAt).toLocaleDateString()}`}
-          {row.adminNote && ` — “${row.adminNote}”`}
+          {row.adminNote && `: “${row.adminNote}”`}
         </p>
       )}
 

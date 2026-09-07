@@ -215,7 +215,7 @@ export const LOGIN_REQUIRED = 'Log in to manage your chatbots.';
 
 /** Returned when an anonymous draft tries to save an API key. */
 export const SIGNUP_FOR_KEYS =
-  'Create a free account to save an API key — keys are encrypted and stored only on accounts, never on anonymous drafts.';
+  'Create a free account to save an API key. Keys are encrypted and stored only on accounts, never on anonymous drafts.';
 
 /**
  * The root admin's address, normalised — or null when none is configured.

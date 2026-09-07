@@ -543,7 +543,7 @@ returns:    30 days, unused items
                           </label>
                           {anonMode ? (
                             <p className="rounded-control border-2 border-slate-200 bg-slate-50 px-3.5 py-3 text-[12.5px] text-slate-500">
-                              Needs an account — embedding keys are stored on accounts only.
+                              Needs an account. Embedding keys are stored on accounts only.
                             </p>
                           ) : (
                             <input
@@ -800,7 +800,7 @@ returns:    30 days, unused items
                 </span>
                 {anonMode ? (
                   <div className="rounded-control border-2 border-accent-200 bg-accent-50 px-4 py-3.5 text-[13px] font-semibold leading-relaxed text-slate-700">
-                    🔒 Keys live on accounts. This draft runs on {ANON_TRIAL_MESSAGES} free trial messages —{' '}
+                    🔒 Keys live on accounts. This draft runs on {ANON_TRIAL_MESSAGES} free trial messages.{' '}
                     <Link
                       className="text-accent-600 underline underline-offset-2"
                       href={`/account?next=${mode === 'create' ? '/create' : `/bots/${botId}/edit`}`}

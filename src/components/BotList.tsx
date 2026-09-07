@@ -43,7 +43,7 @@ export default function BotList({ preview = false }: { preview?: boolean }) {
     if (preview) return null;
     return (
       <div className="card text-center">
-        <p className="text-sm text-slate-600">Log in to see your chatbots — and to create new ones.</p>
+        <p className="text-sm text-slate-600">Log in to see your chatbots, and to create new ones.</p>
         <p className="mt-1 text-xs text-slate-500">
           Your bots and encrypted API keys live on your account, so they are not stuck in one browser.
         </p>
@@ -106,7 +106,7 @@ export default function BotList({ preview = false }: { preview?: boolean }) {
       )}
       {anon && !preview && (
         <div className="mb-4 rounded-control border border-accent-200 bg-accent-50 px-4 py-3 text-sm leading-relaxed text-slate-700">
-          These drafts live only in this browser — clear your browsing data and they are gone.{' '}
+          These drafts live only in this browser. Clear your browsing data and they are gone.{' '}
           <Link href="/account" className="font-medium underline underline-offset-2">
             Sign up free
           </Link>{' '}

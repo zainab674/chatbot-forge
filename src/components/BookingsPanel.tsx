@@ -110,7 +110,7 @@ export default function BookingsPanel({ botId }: { botId: string }) {
       </div>
 
       <p className="hint mt-3">
-        Confirming here only tracks it for you — the visitor is not notified automatically, so reply to them at the
+        Confirming here only tracks it for you. The visitor is not notified automatically, so reply to them at the
         contact they left.
       </p>
     </section>

@@ -73,7 +73,7 @@ export async function createKeyRequest(
   if (!provider) return { error: 'Pick a provider to ask about.', status: 400 };
 
   const reason = String(input.reason ?? '').trim().slice(0, KEY_REQUEST_MAX_CHARS);
-  if (!reason) return { error: 'Say what you need the key for — the admin sees only this.', status: 400 };
+  if (!reason) return { error: 'Say what you need the key for. The admin sees only this.', status: 400 };
 
   const col = await keyRequests();
   const waiting = await col.findOne({ userId: user.id, provider: provider.id, status: 'pending' });

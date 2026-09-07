@@ -77,7 +77,7 @@ export function SparkStep({
           onClick={onSkip}
           className="inline-flex min-h-[24px] items-center text-[10.5px] font-medium uppercase tracking-wide text-slate-700 underline decoration-slate-300 underline-offset-4 transition hover:text-accent-700 hover:decoration-accent-600"
         >
-          Skip — start from blank →
+          Skip and start from blank →
         </button>
       </div>
 
@@ -174,7 +174,7 @@ export function ShipStep({
         <div className="min-w-0">
           <h3 className="font-serif text-[22px] font-normal">{cfg.name || 'Your chatbot'} is live.</h3>
           <p className="text-[13.5px] font-medium text-slate-700">
-            Change anything later — the link stays the same.
+            Change anything later. The link stays the same.
           </p>
         </div>
         <label className="ml-auto flex cursor-pointer items-center gap-2.5 rounded-control border border-emerald-600 bg-white py-2 pl-3.5 pr-2 text-[10.5px] font-medium uppercase tracking-wide text-emerald-700">
@@ -401,7 +401,7 @@ export function ModelAside({
           {(cfg.logConversations ?? false) && (
             <p className="text-[11px] leading-relaxed text-slate-500">
               Transcripts appear on the manage screen and delete themselves after{' '}
-              {cfg.logRetentionDays ?? 30} days. Tell your visitors — in most places you have to.
+              {cfg.logRetentionDays ?? 30} days. Tell your visitors; in most places you have to.
             </p>
           )}
         </div>

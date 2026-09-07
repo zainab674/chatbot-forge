@@ -14,7 +14,7 @@ export default function AccountPage() {
         back={{ href: '/', label: 'Home' }}
         kicker="Your account"
         title="Account"
-        sub="Free with your own API keys, forever. Or add credits and run your bots on ours — no key hunting."
+        sub="Free with your own API keys, forever. Or add credits and run your bots on ours, with no key hunting."
       />
       <AccountPanel />
     </Shell>

@@ -49,7 +49,7 @@ export default function ResetPassword() {
   if (!token) {
     return (
       <div className="card max-w-md">
-        <p className="text-sm">That link is missing its token — it may have been cut in half by an email client.</p>
+        <p className="text-sm">That link is missing its token. It may have been cut in half by an email client.</p>
         <Link href="/account" className="btn-primary mt-4">
           Ask for a new link
         </Link>
@@ -92,7 +92,7 @@ export default function ResetPassword() {
         }}
       />
 
-      {tooShort && <p className="hint mt-2 text-amber-700">A little longer — eight characters minimum.</p>}
+      {tooShort && <p className="hint mt-2 text-amber-700">A little longer: eight characters minimum.</p>}
       {mismatch && <p className="hint mt-2 text-amber-700">Those two do not match.</p>}
       {error && (
         <p className="mt-3 rounded-control border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs text-red-700">{error}</p>

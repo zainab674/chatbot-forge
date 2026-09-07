@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
         to: user.email,
         subject: 'Your Chatbot Forge credits are ready',
         text:
-          `Thanks — your payment went through.\n\n` +
+          `Thanks. Your payment went through.\n\n` +
           `${credits.toLocaleString('en')} credits have been added. Your balance is now ${balance.toLocaleString('en')}.\n\n` +
           `Any bot saved without an API key of its own will now run on ours, on the included models.`,
       }).catch(() => {});

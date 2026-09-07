@@ -930,21 +930,20 @@ button.card:active {
 /* ---- the numbered three-up ---- */
 /* Was a hairline grid of flat white panels. Now each one is a sheet that
    lifts, with the numeral doing the work the old 1px rule was doing. */
-.numcard {
-  @apply relative overflow-hidden rounded-card border border-slate-200 bg-white px-7 py-9 shadow-lift transition duration-300 ease-editorial;
-}
-.numcard:hover {
-  @apply -translate-y-1 shadow-lift-lg;
+/* Columns, not cards. A rule along the top and a hanging numeral, which is the
+   same device the rest of the page uses for a section opening — and which the
+   bordered, shadowed, rounded box it replaced was not. */
+.pillar {
+  @apply border-t border-slate-300 pt-6;
 }
 /* sand-500 rather than sand-300. At 44px this counts as large text, so it owes
    3:1 and the pale original measured 1.62:1. This is the lightest step on the
    ramp that clears it, so the numeral stays a secondary mark rather than
    becoming a second headline. */
-.numcard-n {
-  @apply font-serif text-[44px] font-normal leading-none text-accent-600 transition duration-300 ease-editorial;
-}
-.numcard:hover .numcard-n {
-  @apply text-accent-500;
+/* accent-600 rather than the old pale sand: at 42px this is large text, so it
+   owes 3:1, and the original measured 1.62:1. */
+.pillar-n {
+  @apply block font-serif text-[42px] font-normal leading-none text-accent-600;
 }
 
 
@@ -1066,15 +1065,13 @@ button.card:active {
 .tone-ink .shipcard,
 .tone-ink .side-card,
 .tone-ink .tile,
-.tone-ink .numcard,
 .tone-ink .prov {
   @apply border-white/10 bg-white/[0.05] text-slate-100 shadow-none;
 }
 .tone-ink a.card:hover,
 .tone-ink button.card:hover,
 .tone-ink .tile:hover,
-.tone-ink .prov:hover,
-.tone-ink .numcard:hover {
+.tone-ink .prov:hover {
   @apply border-white/25 bg-white/[0.08] shadow-none;
 }
 .tone-ink .tile-on,
@@ -1211,8 +1208,7 @@ button.card:active {
 }
 .tone-sand .card,
 .tone-sand .shipcard,
-.tone-sand .tile,
-.tone-sand .numcard {
+.tone-sand .tile {
   @apply border-accent-400/50 bg-white/70 shadow-none;
 }
 .tone-sand .input,

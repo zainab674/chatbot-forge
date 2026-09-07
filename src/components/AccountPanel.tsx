@@ -54,7 +54,7 @@ export default function AccountPanel() {
     // webhook, which can land a moment later than the redirect does.
     const outcome = new URLSearchParams(window.location.search).get('purchase');
     if (outcome === 'success') {
-      setNotice('Payment received — your credits will appear within a few seconds.');
+      setNotice('Payment received. Your credits will appear within a few seconds.');
       setTimeout(() => {
         fetch('/api/auth/me')
           .then((r) => r.json())
@@ -62,7 +62,7 @@ export default function AccountPanel() {
           .catch(() => {});
       }, 3_000);
     } else if (outcome === 'cancelled') {
-      setNotice('Checkout cancelled — nothing was charged.');
+      setNotice('Checkout cancelled. Nothing was charged.');
     }
   }, []);
 
@@ -291,7 +291,7 @@ export default function AccountPanel() {
           </button>
           {tab === 'signup' && (
             <p className="mt-3 text-xs text-slate-500">
-              New accounts start with {SIGNUP_CREDITS} free credits — one credit is one message on our API
+              New accounts start with {SIGNUP_CREDITS} free credits. One credit is one message on our API
               keys, so you can build a bot and talk to it before adding a key of your own.
             </p>
           )}
@@ -316,7 +316,7 @@ export default function AccountPanel() {
         <div className="card tone-sand">
           <h2 className="text-sm font-semibold">Why make an account?</h2>
           <ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-relaxed text-slate-600">
-            <li>Your bots stop living in one browser — log in anywhere and they are there.</li>
+            <li>Your bots stop living in one browser: log in anywhere and they are there.</li>
             <li>
               With credits, your bots can run on our API keys: leave the key field blank, pick an included model, done.
               One message costs one credit.
@@ -363,7 +363,7 @@ export default function AccountPanel() {
         {buyingEnabled === false && (
           <div className="tone-sand mt-3 rounded-control px-4 py-3 text-xs leading-relaxed text-slate-800">
             <span className="font-medium text-slate-900">Need credits?</span> Card payment is not switched on for this
-            deployment — ask an admin to load your account.
+            deployment. Ask an admin to load your account.
           </div>
         )}
 
@@ -411,7 +411,7 @@ export default function AccountPanel() {
           </div>
 
           {me.emailVerified === false && (
-            <p className="hint mt-3 text-amber-700">Confirm your email address before buying — the receipt goes there.</p>
+            <p className="hint mt-3 text-amber-700">Confirm your email address before buying: the receipt goes there.</p>
           )}
         </div>
       )}

@@ -72,8 +72,8 @@ export async function POST(req: NextRequest) {
       text:
         `Someone asked to reset the password for this account.\n\n` +
         `${link}\n\n` +
-        `The link works once and expires in an hour. If this was not you, ignore this email — ` +
-        `nothing has changed, and your current password still works.`,
+        `The link works once and expires in an hour. If this was not you, ignore this email. ` +
+        `Nothing has changed, and your current password still works.`,
     });
 
     if (!mailConfigured()) {

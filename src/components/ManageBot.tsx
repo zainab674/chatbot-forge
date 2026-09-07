@@ -167,7 +167,7 @@ export default function ManageBot({ id }: { id: string }) {
                 <span className="font-medium text-slate-900">
                   {Math.max(0, ANON_TRIAL_MESSAGES - (bot.messageCount ?? 0))} of {ANON_TRIAL_MESSAGES}
                 </span>{' '}
-                free trial messages left — try it in the live test on the right.
+                free trial messages left. Try it in the live test on the right.
               </>
             ) : (
               <>
