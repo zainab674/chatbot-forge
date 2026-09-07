@@ -3,19 +3,20 @@
 /**
  * The numbered three-up.
  *
- * The cards already lift on hover in CSS; what they never had was an arrival.
- * They now deal in from the left with a beat between them, and each one carries
- * a light that follows the cursor across it — a card lit from wherever the
- * pointer is reads as a sheet of paper under a lamp, which is the whole
- * conceit of the palette.
+ * The cards lift on hover in CSS, and the numeral slides a few pixels with
+ * them, so the thing carrying the visual weight is the thing that answers the
+ * pointer first.
  *
- * The numeral gets its own treatment: it counts up out of nothing and slides a
- * few pixels when the card is hovered, so the thing carrying the visual weight
- * is also the thing that answers the pointer first.
+ * There used to be a lamp here too — a radial glow tracking the cursor across
+ * each card. It was removed on purpose. Whatever it once signalled, a
+ * cursor-following gradient now reads as the house style of every generated
+ * landing page on the internet, and a design this specific about its type and
+ * its palette should not be wearing the one effect everybody recognises. The
+ * hover lift does the same job without the tell.
  */
 
 import { motion } from 'framer-motion';
-import { EASE, useSpotlight, useLessMotion } from '@/components/motion/primitives';
+import { EASE, useLessMotion } from '@/components/motion/primitives';
 
 export type Pillar = readonly [string, string, string];
 
@@ -39,20 +40,9 @@ export default function Pillars({ pillars }: { pillars: readonly Pillar[] }) {
 
 function Card({ num, title, body }: { num: string; title: string; body: string }) {
   const reduce = useLessMotion();
-  const spot = useSpotlight(300);
 
   const card = (
     <>
-      {/* The lamp. It sits under the content and above the card's own fill, and
-          `.numcard`'s `overflow-hidden` is what keeps it inside the corners. */}
-      {spot.enabled && (
-        <motion.span
-          aria-hidden
-          className="pointer-events-none absolute inset-0"
-          style={spot.style}
-          transition={{ duration: 0.3 }}
-        />
-      )}
       <div className="relative">
         <motion.span
           className="numcard-n block"
@@ -67,7 +57,7 @@ function Card({ num, title, body }: { num: string; title: string; body: string }
           {num}
         </motion.span>
         <h3 className="mt-5 font-serif text-[22px] font-normal">{title}</h3>
-        <p className="mt-3 text-[13.5px] font-light leading-[1.8] text-slate-600">{body}</p>
+        <p className="mt-3 text-[13.5px] font-light leading-[1.8] text-slate-700">{body}</p>
       </div>
     </>
   );
@@ -88,7 +78,6 @@ function Card({ num, title, body }: { num: string; title: string; body: string }
         hover: { y: -4, transition: { duration: 0.3, ease: EASE } },
       }}
       whileHover="hover"
-      {...spot.handlers}
     >
       {card}
     </motion.div>

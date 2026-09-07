@@ -33,7 +33,6 @@ import {
   useScroll,
   useSpring,
   useTransform,
-  type MotionStyle,
   type Variants,
 } from 'framer-motion';
 
@@ -422,40 +421,4 @@ export function ScrollProgress() {
       style={{ scaleX }}
     />
   );
-}
-
-/* -------------------------------------------------------------- spotlight */
-
-/**
- * A soft light that follows the cursor across a surface. It hands back the
- * handlers and a style rather than rendering anything, so the caller can put
- * the glow on whichever child it belongs on — usually an absolutely positioned
- * overlay inside a card that already has its own border and shadow.
- */
-export function useSpotlight(size = 280, tint = 'rgba(199,154,85,.20)') {
-  const reduce = useLessMotion();
-  const mx = useMotionValue(-9999);
-  const my = useMotionValue(-9999);
-  const opacity = useMotionValue(0);
-
-  const background = useTransform(
-    [mx, my],
-    ([x, y]: number[]) => `radial-gradient(${size}px circle at ${x}px ${y}px, ${tint}, transparent 72%)`,
-  );
-
-  const onPointerMove = useCallback(
-    (e: PointerEvent<HTMLElement>) => {
-      const box = e.currentTarget.getBoundingClientRect();
-      mx.set(e.clientX - box.left);
-      my.set(e.clientY - box.top);
-      opacity.set(1);
-    },
-    [mx, my, opacity],
-  );
-
-  const onPointerLeave = useCallback(() => opacity.set(0), [opacity]);
-
-  const style: MotionStyle = { opacity, background };
-
-  return { enabled: !reduce, handlers: { onPointerMove, onPointerLeave }, style };
 }

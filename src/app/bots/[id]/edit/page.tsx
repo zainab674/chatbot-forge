@@ -2,7 +2,7 @@ import Shell from '@/components/Shell';
 import EditBot from '@/components/EditBot';
 
 export const metadata = {
-  title: 'Edit chatbot — Chatbot Forge',
+  title: 'Edit chatbot | Chatbot Forge',
   robots: { index: false, follow: false },
 };
 

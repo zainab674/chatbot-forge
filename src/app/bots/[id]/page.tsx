@@ -2,7 +2,7 @@ import Shell from '@/components/Shell';
 import ManageBot from '@/components/ManageBot';
 
 export const metadata = {
-  title: 'Chatbot — Chatbot Forge',
+  title: 'Chatbot | Chatbot Forge',
   robots: { index: false, follow: false },
 };
 
